@@ -88,3 +88,16 @@ The first request after starting Ollama (or switching models) triggers model loa
 ### Tokens look strange (special characters)
 
 The visualizer replaces leading spaces with `␠` so whitespace is visible. The actual token used when you click is the original (with the real space). Newlines show as `↵` and tabs as `→`.
+
+---
+
+## How This Was Built
+
+This project was vibe-coded using [Claude Code](https://claude.com/claude-code) from a single prompt. See [`PROMPT.md`](PROMPT.md) for the full prompt used.
+
+The prompt itself was created by chatgpt (5.2) with a conversation on what i was trying to create. I did some light editing to align with what I really wanted.  A simple prompt like this would work for a start I think:
+
+```
+create a prompt for a coding agent like Claude Code to create a demo using flask and Ollama running locally with the probability bars and the ability of the user to select a token on the graph and then the next token appears and so on. Default model gemma3.
+```
+
