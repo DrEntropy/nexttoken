@@ -141,6 +141,58 @@ def next_token():
     })
 
 
+@app.route("/api/chat", methods=["POST"])
+def chat():
+    """
+    Generate a chat reply using the loaded model.
+
+    Expects JSON:
+      { "messages": [{"role": "user", "content": "..."}, ...],
+        "max_new_tokens": 200, "temperature": 0.7 }
+
+    Returns JSON:
+      { "reply": "..." }
+    """
+    if _model is None or _tokenizer is None:
+        return jsonify({"error": "Model is still loading. Please wait."}), 503
+
+    body = request.get_json(force=True)
+    messages = body.get("messages", [])
+    max_new_tokens = min(int(body.get("max_new_tokens", 200)), 512)
+    temperature = float(body.get("temperature", 0.7))
+
+    if not messages:
+        return jsonify({"error": "No messages provided."}), 400
+
+    try:
+        # ── Format conversation using the model's chat template ──
+        prompt_text = _tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        inputs = _tokenizer(prompt_text, return_tensors="pt").to(DEVICE)
+        input_len = inputs["input_ids"].shape[1]
+
+        # ── Generate ──
+        with torch.no_grad():
+            output_ids = _model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                do_sample=temperature > 0,
+                top_p=0.9,
+                repetition_penalty=1.1,
+            )
+
+        # ── Decode only newly generated tokens ──
+        new_ids = output_ids[0][input_len:]
+        reply = _tokenizer.decode(new_ids, skip_special_tokens=True)
+
+    except Exception as exc:
+        return jsonify({"error": f"Generation error: {exc}"}), 500
+
+    return jsonify({"reply": reply})
+
+
 @app.route("/api/models", methods=["GET"])
 def list_models():
     """Return the loaded model name."""

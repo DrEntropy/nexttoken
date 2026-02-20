@@ -13,6 +13,7 @@ Interactive single-page web app that visualizes next-token predictions using a H
 ### Key API endpoints
 
 - `POST /api/next-token` — main inference endpoint (`{text, top_k, temperature}` → candidates + sampled token)
+- `POST /api/chat` — chat completion endpoint (`{messages, max_new_tokens, temperature}` → `{reply}`)
 - `GET /api/models` — returns the currently loaded model name
 
 ### Inference flow
