@@ -10,7 +10,12 @@ Interactive single-page web app that visualizes next-token predictions using a H
 - **Frontend**: `templates/index.html` — single HTML file with inline CSS/JS, no build step
 - **Model loading**: uses `transformers` (`AutoModelForCausalLM` / `AutoTokenizer`) to load a HuggingFace model directly into the process — no external service required
 
-### Key API flow
+### Key API endpoints
+
+- `POST /api/next-token` — main inference endpoint (`{text, top_k, temperature}` → candidates + sampled token)
+- `GET /api/models` — returns the currently loaded model name
+
+### Inference flow
 
 1. Frontend `POST /api/next-token` with `{text, top_k, temperature}`
 2. Backend tokenizes input, runs a forward pass through the model, extracts last-position logits
@@ -19,7 +24,7 @@ Interactive single-page web app that visualizes next-token predictions using a H
 
 ### Model loading
 
-The model is loaded at module level (guarded by `WERKZEUG_RUN_MAIN` to avoid double-loading with Flask's reloader). First run downloads the model from HuggingFace Hub (~720 MB for the default model). `use_reloader=False` is set in `app.run()` to prevent double loading.
+The model is loaded unconditionally at module level via `_load_model()`. First run downloads the model from HuggingFace Hub (~720 MB for the default model). `use_reloader=False` is set in `app.run()` to prevent Flask's reloader from triggering a second load.
 
 ## Tech Stack
 
@@ -41,14 +46,16 @@ The model is loaded at module level (guarded by `WERKZEUG_RUN_MAIN` to avoid dou
 demo.py              # Flask app — model loading, inference, routes, entry point
 templates/index.html # Single-page UI (HTML + inline CSS + inline JS)
 pyproject.toml       # uv/pip project config
+uv.lock              # Dependency lockfile
 README.md            # User-facing setup & troubleshooting
+prompt.md            # Original generation prompt used to create this project
 ```
 
 ## Code Conventions
 
 - Keep it single-file backend (`demo.py`) — don't split into modules unless it grows significantly
 - Frontend stays as a single HTML file with inline styles and scripts — no npm, no bundler
-- Comments use `# ── Section ──` banner style for visual separation
+- Major section banners use `# ---...---` dashes; inline subsection comments use `# ── Section ──` style
 - Error responses from `/api/next-token` return `{"error": "..."}` with appropriate HTTP status codes (400, 500, 503)
 
 ## Common Tasks
