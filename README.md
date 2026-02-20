@@ -28,6 +28,14 @@ Open **http://localhost:5005** in your browser.
 | `NEXTTOKEN_MODEL` | `HuggingFaceTB/SmolLM2-360M-Instruct` | HuggingFace model ID to load |
 | `NEXTTOKEN_DEVICE` | `auto` | Inference device: `auto` (CUDA > MPS > CPU), `cpu`, `cuda`, `mps` |
 
+To see which models you already have cached locally:
+
+```bash
+uv run list_models.py
+```
+
+This prints model IDs ready to copy-paste as the `NEXTTOKEN_MODEL` value.
+
 Example with a different model:
 
 ```bash
