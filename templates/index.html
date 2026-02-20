@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Next-Token Visualizer</title>
+<style>
+  /* ── Reset & base ──────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    background: #0f1117;
+    color: #e0e0e0;
+    line-height: 1.5;
+    padding: 1.5rem;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 0.25rem; color: #fff; }
+  h1 span { color: #7c8aff; }
+  .subtitle { font-size: 0.85rem; color: #888; margin-bottom: 1.25rem; }
+
+  /* ── Cards ─────────────────────────────────────────────────────── */
+  .card {
+    background: #1a1d27;
+    border: 1px solid #2a2d3a;
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .card h2 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #7c8aff;
+    margin-bottom: 0.75rem;
+  }
+
+  /* ── Form elements ─────────────────────────────────────────────── */
+  label { display: block; font-size: 0.8rem; color: #aaa; margin-bottom: 0.25rem; }
+  textarea, input[type="text"], input[type="number"] {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: #12141c;
+    border: 1px solid #2a2d3a;
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.9rem;
+    resize: vertical;
+  }
+  textarea:focus, input:focus { outline: none; border-color: #7c8aff; }
+  textarea { min-height: 80px; }
+
+  .controls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 0.75rem;
+    align-items: end;
+  }
+  .toggle-group {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding-bottom: 0.35rem;              /* align with inputs */
+  }
+  .toggle-group input[type="checkbox"] {
+    width: 18px; height: 18px; accent-color: #7c8aff;
+  }
+  .toggle-group label { margin: 0; font-size: 0.85rem; color: #ccc; }
+
+  /* ── Buttons ───────────────────────────────────────────────────── */
+  .btn-row { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+  button {
+    padding: 0.55rem 1.25rem;
+    border: none; border-radius: 6px;
+    font-size: 0.85rem; font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-primary   { background: #7c8aff; color: #fff; }
+  .btn-primary:hover { background: #6570e0; }
+  .btn-secondary { background: #2a2d3a; color: #ccc; }
+  .btn-secondary:hover { background: #363a4a; }
+  .btn-warning   { background: #e06c40; color: #fff; }
+  .btn-warning:hover { background: #c55a33; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Current text display ──────────────────────────────────────── */
+  #currentText {
+    min-height: 80px;
+    background: #12141c;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border: 1px solid #2a2d3a;
+    color: #e0e0e0;
+  }
+
+  /* ── Bar chart ─────────────────────────────────────────────────── */
+  #chart { min-height: 60px; }
+  .bar-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    margin-bottom: 4px; cursor: pointer;
+    padding: 3px 6px; border-radius: 6px;
+    transition: background 0.12s;
+  }
+  .bar-row:hover { background: #252838; }
+  .bar-label {
+    width: 140px; min-width: 140px;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.82rem;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #ccc;
+  }
+  .bar-track {
+    flex: 1; height: 22px;
+    background: #12141c;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #7c8aff 0%, #5b6ae0 100%);
+    transition: width 0.25s ease;
+  }
+  .bar-value {
+    width: 72px; min-width: 72px;
+    font-size: 0.78rem;
+    color: #999;
+    text-align: left;
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  /* ── Warning / status ──────────────────────────────────────────── */
+  .warning {
+    background: #3a2a10;
+    border: 1px solid #e0a040;
+    color: #f0c060;
+    padding: 0.6rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    margin-bottom: 0.75rem;
+  }
+  .error {
+    background: #3a1515;
+    border: 1px solid #e04040;
+    color: #ff8080;
+    padding: 0.6rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    margin-bottom: 0.75rem;
+  }
+  #status {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.5rem;
+    min-height: 1.2em;
+  }
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid #444;
+    border-top-color: #7c8aff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 0.4rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<h1><span>&#9654;</span> Next-Token Visualizer</h1>
+<p class="subtitle">Explore language model predictions one token at a time &mdash; powered by Ollama</p>
+
+<!-- ── Prompt input ────────────────────────────────────────────── -->
+<div class="card">
+  <h2>Prompt</h2>
+  <textarea id="prompt" placeholder="Enter your prompt here…">The capital of France is</textarea>
+</div>
+
+<!-- ── Controls ────────────────────────────────────────────────── -->
+<div class="card">
+  <h2>Controls</h2>
+  <div class="controls-grid">
+    <div>
+      <label for="model">Model</label>
+      <input type="text" id="model" value="{{ default_model }}" />
+    </div>
+    <div>
+      <label for="topK">Top-K</label>
+      <input type="number" id="topK" value="10" min="1" max="50" />
+    </div>
+    <div>
+      <label for="temperature">Temperature</label>
+      <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1" />
+    </div>
+    <div class="toggle-group">
+      <input type="checkbox" id="rawMode" checked />
+      <label for="rawMode">Raw mode</label>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn-primary" id="btnStart" onclick="startSession()">Start</button>
+    <button class="btn-secondary" id="btnGreedy" onclick="greedyPick()" disabled>Greedy</button>
+    <button class="btn-warning" id="btnReset" onclick="resetSession()">Reset</button>
+  </div>
+  <div id="status"></div>
+</div>
+
+<!-- ── Current text ────────────────────────────────────────────── -->
+<div class="card">
+  <h2>Current Text</h2>
+  <div id="currentText"></div>
+</div>
+
+<!-- ── Visualization ───────────────────────────────────────────── -->
+<div class="card">
+  <h2>Next-Token Candidates</h2>
+  <div id="warning"></div>
+  <div id="errorBox"></div>
+  <div id="chart"><span style="color:#666">Press <b>Start</b> to begin.</span></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let currentText = "";
+let candidates  = [];
+let busy        = false;
+
+// ── DOM refs ───────────────────────────────────────────────────────
+const $prompt    = document.getElementById("prompt");
+const $model     = document.getElementById("model");
+const $topK      = document.getElementById("topK");
+const $temp      = document.getElementById("temperature");
+const $raw       = document.getElementById("rawMode");
+const $text      = document.getElementById("currentText");
+const $chart     = document.getElementById("chart");
+const $warning   = document.getElementById("warning");
+const $error     = document.getElementById("errorBox");
+const $status    = document.getElementById("status");
+const $btnStart  = document.getElementById("btnStart");
+const $btnGreedy = document.getElementById("btnGreedy");
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+/** Make whitespace visible for display (does NOT change the actual token). */
+function displayToken(tok) {
+  // Replace leading spaces with open-box symbol ␠
+  let display = tok.replace(/^ /, "\u2420");
+  // Also show tabs and newlines
+  display = display.replace(/\t/g, "\u2192\t");
+  display = display.replace(/\n/g, "\u21B5\n");
+  return display;
+}
+
+function setStatus(msg, loading) {
+  $status.innerHTML = (loading ? '<span class="spinner"></span>' : "") + msg;
+}
+
+function showWarning(msg) {
+  $warning.innerHTML = msg ? `<div class="warning">${msg}</div>` : "";
+}
+
+function showError(msg) {
+  $error.innerHTML = msg ? `<div class="error">${msg}</div>` : "";
+}
+
+// ── API call ───────────────────────────────────────────────────────
+async function fetchNextToken(text) {
+  const resp = await fetch("/api/next-token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text:        text,
+      model:       $model.value.trim(),
+      top_k:       parseInt($topK.value, 10),
+      temperature: parseFloat($temp.value),
+      raw:         $raw.checked,
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+  return data;
+}
+
+// ── Rendering ──────────────────────────────────────────────────────
+
+function renderText() {
+  $text.textContent = currentText;
+}
+
+function renderChart() {
+  if (candidates.length === 0) {
+    $chart.innerHTML = '<span style="color:#666">No candidates yet.</span>';
+    $btnGreedy.disabled = true;
+    return;
+  }
+  $btnGreedy.disabled = candidates.length <= 1;
+
+  const maxProb = Math.max(...candidates.map(c => c.prob));
+  $chart.innerHTML = candidates.map(c => {
+    const pct  = maxProb > 0 ? (c.prob / maxProb) * 100 : 0;
+    const disp = displayToken(c.token);
+    const probStr = (c.prob * 100).toFixed(2) + "%";
+    // data-token carries the raw token (used on click)
+    return `
+      <div class="bar-row" onclick="pickToken(this)" data-token="${encodeURIComponent(c.token)}" title="${disp}  →  ${probStr}">
+        <span class="bar-label">${escapeHtml(disp)}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <span class="bar-value">${probStr}</span>
+      </div>`;
+  }).join("");
+}
+
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ── Actions ────────────────────────────────────────────────────────
+
+async function queryAndRender() {
+  busy = true;
+  $btnStart.disabled = true;
+  setStatus("Querying Ollama…", true);
+  showError("");
+  showWarning("");
+
+  try {
+    const data = await fetchNextToken(currentText);
+    candidates = data.candidates || [];
+    if (data.warning) showWarning(data.warning);
+    renderChart();
+    setStatus("Click a token to continue, or press Greedy.", false);
+  } catch (err) {
+    showError(err.message);
+    setStatus("Error — check Ollama.", false);
+    candidates = [];
+    renderChart();
+  } finally {
+    busy = false;
+    $btnStart.disabled = false;
+  }
+}
+
+function startSession() {
+  if (busy) return;
+  currentText = $prompt.value;
+  renderText();
+  queryAndRender();
+}
+
+async function pickToken(el) {
+  if (busy) return;
+  const token = decodeURIComponent(el.dataset.token);
+  currentText += token;
+  renderText();
+  await queryAndRender();
+}
+
+async function greedyPick() {
+  if (busy || candidates.length === 0) return;
+  // Pick the highest-probability candidate
+  const best = candidates.reduce((a, b) => a.prob >= b.prob ? a : b);
+  currentText += best.token;
+  renderText();
+  await queryAndRender();
+}
+
+function resetSession() {
+  currentText = "";
+  candidates  = [];
+  renderText();
+  renderChart();
+  showWarning("");
+  showError("");
+  setStatus("");
+  $btnGreedy.disabled = true;
+  $chart.innerHTML = '<span style="color:#666">Press <b>Start</b> to begin.</span>';
+}
+</script>
+</body>
+</html>
