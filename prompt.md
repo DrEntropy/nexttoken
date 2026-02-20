@@ -19,8 +19,12 @@ HARD CONSTRAINTS
 
 TECH STACK
 - Package management: uv
-- Python 3.11 + Flask + ollama python library
-- Ollama model:  gemma3, but make it configurable via environment variable
+- Python 3.11 + Flask + requests
+  (call Ollama REST API directly at /api/generate — do NOT use the
+   ollama Python library, it doesn't reliably support logprobs/top_logprobs)
+- Single HTML file frontend (templates/index.html), no build tools
+- Ollama model: gemma3, configurable via NEXTTOKEN_MODEL env var
+- Ollama host: configurable via OLLAMA_HOST env var (default http://localhost:11434)
 
 IMPORTANT NOTE ABOUT PROBABILITIES
 Ollama can return per-token logprobs for generated tokens and (depending on model/runtime) can expose top candidates when enabled. Implement against Ollama’s /api/generate endpoint with:
@@ -28,7 +32,7 @@ Ollama can return per-token logprobs for generated tokens and (depending on mode
 - stream = false
 - raw = true (so prompt templating does not interfere; provide a UI toggle)
 - logprobs = true
-- top_logprobs = K
+- top_logprobs = num_candidates (number of candidate tokens to return, separate from sampling top_k)
 
 If top candidates are unavailable for a model, the app MUST degrade gracefully:
 - Show only the sampled token as a single bar with probability 1.0
@@ -41,7 +45,7 @@ A) UI (single page)
 - Read-only textarea: “current text” (updates as tokens are appended)
 - Controls:
   - model name (text input, default from env)
-  - top_k (number input, default 10)
+  - num_candidates (number input, default 10) — controls top_logprobs (how many candidate tokens to display); this is separate from Ollama's sampling top_k
   - temperature (0.0–2.0, default 0.7)
   - raw mode toggle (default ON)
 - Buttons:
@@ -50,19 +54,27 @@ A) UI (single page)
   - Reset (clears state)
 - Visualization:
   - Horizontal bar chart (preferred) with candidate tokens and probabilities
+  - Bars should be clickable (clicking appends the token). Use a clean, minimal color scheme.
   - Token labels must make whitespace visible:
     - replace leading space with “␠” for display only (do not modify the actual token used)
-  - Show probability numeric values (tooltip or inline)
+  - Show probability numeric values inline next to each bar
  
-B) README
+B) Backend API
+- Include a GET /api/models endpoint that queries Ollama's /api/tags so the UI can offer a model dropdown.
+- Serve the frontend from templates/index.html using Flask's render_template.
+
+C) README
 Include:
-- prerequisites (Docker) and ollama
+- prerequisites: Ollama installed and running
 - how to run: uv run demo.py
 - open http://localhost:5005
 - troubleshooting section:
   - model not found
   - top_k unavailable warning meaning
   - slow first token due to model load
+
+D) CLAUDE.md
+Generate a CLAUDE.md file documenting: architecture, key API flow, tech stack, env vars, file structure, code conventions, and common tasks. This serves as context for future AI-assisted development.
 
  
 
