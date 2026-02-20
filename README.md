@@ -42,12 +42,24 @@ NEXTTOKEN_DEVICE=cpu uv run demo.py
 
 ## UI Controls
 
+The app has two tabs: **Token Explorer** and **Chat**.
+
+### Token Explorer
+
 - **Model** — Shows the loaded model (read-only; change via `NEXTTOKEN_MODEL` env var)
 - **Top-K** — Number of candidate tokens to display (1–50)
 - **Temperature** — Sampling temperature (0.0–2.0; 0 = greedy/deterministic)
 - **Start** — Initialize with the current prompt and fetch first candidates
 - **Greedy** — Auto-pick the highest-probability candidate
 - **Reset** — Clear everything and start over
+
+### Chat
+
+A simple multi-turn chat interface that lets you converse with the loaded model. **Requires an instruct-tuned model** (e.g. one with `-Instruct` in the name). If you load a base model, the Chat tab will show an error explaining that a chat template is needed.
+
+- **Max reply tokens** — Cap on generated tokens per reply (1–512)
+- **Temperature** — Sampling temperature for chat responses
+- **Clear Chat** — Reset the conversation history
 
 ## Troubleshooting
 
@@ -75,7 +87,7 @@ The visualizer replaces leading spaces with `␠` so whitespace is visible. The 
 
 ## How This Was Built
 
-This project was vibe-coded using [Claude Code](https://claude.com/claude-code). The initial project was created from a single prompt similar to [`PROMPT.md`](PROMPT.md) but the original used Ollama instead of HuggingFace. I switched to HuggingFace for easier local testing and broader model compatibility, but the core idea is the same.
+This project was vibe-coded using [Claude Code](https://claude.com/claude-code). The initial project was created from a single prompt similar to [`PROMPT.md`](PROMPT.md) but the original used Ollama instead of HuggingFace. I switched to HuggingFace for easier local testing and broader model compatibility, but the core idea is the same. The Chat tab was also added later, also with Claude Code's help but that is not reflected in this prompt.
 
 The prompt itself was created by chatgpt (5.2) with a conversation on what i was trying to create. A simple prompt like this would work for a start I think:
 

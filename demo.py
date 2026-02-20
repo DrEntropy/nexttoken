@@ -164,6 +164,12 @@ def chat():
     if not messages:
         return jsonify({"error": "No messages provided."}), 400
 
+    if not getattr(_tokenizer, "chat_template", None):
+        return jsonify({
+            "error": f"Model '{DEFAULT_MODEL}' does not have a chat template. "
+                     "Chat requires an instruct-tuned model."
+        }), 400
+
     try:
         # ── Format conversation using the model's chat template ──
         prompt_text = _tokenizer.apply_chat_template(
