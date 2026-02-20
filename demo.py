@@ -1,27 +1,60 @@
 """
 Next-Token Visualization Demo
 ==============================
-A Flask app that queries Ollama one token at a time and lets the user
-explore the probability distribution interactively.
+A Flask app that loads a HuggingFace model and lets the user explore
+the probability distribution interactively, one token at a time.
 
 Run:  uv run demo.py
 Open: http://localhost:5005
 """
 
-import math
 import os
 import textwrap
 
-import requests
+import torch
 from flask import Flask, jsonify, render_template_string, request
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-OLLAMA_BASE = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-DEFAULT_MODEL = os.environ.get("NEXTTOKEN_MODEL", "gemma3")
+DEFAULT_MODEL = os.environ.get("NEXTTOKEN_MODEL", "HuggingFaceTB/SmolLM2-360M-Instruct")
+DEVICE_OVERRIDE = os.environ.get("NEXTTOKEN_DEVICE", "auto")
 
 app = Flask(__name__)
+
+# ---------------------------------------------------------------------------
+# Device resolution
+# ---------------------------------------------------------------------------
+
+def _resolve_device(override: str) -> str:
+    if override != "auto":
+        return override
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+DEVICE = _resolve_device(DEVICE_OVERRIDE)
+
+# ---------------------------------------------------------------------------
+# Model loading
+# ---------------------------------------------------------------------------
+_tokenizer = None
+_model = None
+
+def _load_model():
+    global _tokenizer, _model
+    dtype = torch.float32 if DEVICE == "cpu" else torch.float16
+    print(f"Loading model {DEFAULT_MODEL} on {DEVICE} ({dtype})…")
+    _tokenizer = AutoTokenizer.from_pretrained(DEFAULT_MODEL)
+    _model = AutoModelForCausalLM.from_pretrained(DEFAULT_MODEL, dtype=dtype)
+    _model.to(DEVICE)
+    _model.eval()
+    print("Model loaded.")
+
+_load_model()
 
 # ---------------------------------------------------------------------------
 # HTML template (served inline — single-file simplicity)
@@ -43,108 +76,75 @@ def index():
 @app.route("/api/next-token", methods=["POST"])
 def next_token():
     """
-    Ask Ollama for the next token given the current text.
+    Compute next-token predictions using the loaded HuggingFace model.
 
     Expects JSON:
-      { "text": "...", "model": "gemma3", "top_k": 10,
-        "temperature": 0.7, "raw": true }
+      { "text": "...", "top_k": 10, "temperature": 0.7 }
 
     Returns JSON:
       { "candidates": [ {"token": "...", "prob": 0.42}, ... ],
         "sampled": "...",
-        "warning": null | "..." }
+        "warning": null }
     """
+    if _model is None or _tokenizer is None:
+        return jsonify({"error": "Model is still loading. Please wait."}), 503
+
     body = request.get_json(force=True)
     prompt_text = body.get("text", "")
-    model = body.get("model", DEFAULT_MODEL)
     top_k = int(body.get("top_k", 10))
     temperature = float(body.get("temperature", 0.7))
-    raw = bool(body.get("raw", True))
 
-    # Build request payload for Ollama /api/generate
-    payload = {
-        "model": model,
-        "prompt": prompt_text,
-        "stream": False,
-        "raw": raw,
-        "options": {
-            "num_predict": 1,
-            "temperature": temperature,
-            "top_k": top_k,
-        },
-        "logprobs": True,
-        "top_logprobs": top_k,
-    }
+    if not prompt_text:
+        return jsonify({"error": "Prompt text is empty."}), 400
 
     try:
-        resp = requests.post(
-            f"{OLLAMA_BASE}/api/generate",
-            json=payload,
-            timeout=120,
-        )
-        resp.raise_for_status()
-    except requests.ConnectionError:
-        return jsonify({"error": "Cannot connect to Ollama. Is it running?"}), 502
-    except requests.Timeout:
-        return jsonify({"error": "Ollama request timed out."}), 504
-    except requests.HTTPError as exc:
-        return jsonify({"error": f"Ollama error: {exc.response.text}"}), 502
+        # ── Tokenize ──
+        inputs = _tokenizer(prompt_text, return_tensors="pt").to(DEVICE)
 
-    data = resp.json()
-    sampled_token = data.get("response", "")
+        # ── Forward pass ──
+        with torch.no_grad():
+            outputs = _model(**inputs)
 
-    # Parse logprobs ----------------------------------------------------------
-    warning = None
-    candidates = []
+        # ── Extract last-position logits ──
+        logits = outputs.logits[0, -1, :]  # shape: (vocab_size,)
 
-    logprobs_list = data.get("logprobs")
-
-    if logprobs_list and len(logprobs_list) > 0:
-        entry = logprobs_list[0]  # we requested num_predict=1
-        top = entry.get("top_logprobs")
-        if top and len(top) > 0:
-            # Convert log-probabilities to probabilities
-            for item in top:
-                token = item.get("token", "")
-                logprob = item.get("logprob", 0.0)
-                prob = math.exp(logprob)
-                candidates.append({"token": token, "prob": round(prob, 6)})
-            # Sort descending by probability
-            candidates.sort(key=lambda c: c["prob"], reverse=True)
+        # ── Temperature scaling + softmax ──
+        if temperature <= 0:
+            # Greedy: argmax, uniform probs over top-k for display
+            probs = torch.zeros_like(logits)
+            probs[logits.argmax()] = 1.0
         else:
-            # top_logprobs not available — fallback to sampled token
-            logprob = entry.get("logprob", 0.0)
-            prob = math.exp(logprob)
-            candidates = [{"token": sampled_token, "prob": round(prob, 6)}]
-            warning = (
-                "Top-K candidate probabilities not available for this "
-                "model/runner. Showing only sampled token."
-            )
-    else:
-        # No logprobs at all — full fallback
-        candidates = [{"token": sampled_token, "prob": 1.0}]
-        warning = (
-            "Top-K candidate probabilities not available for this "
-            "model/runner. Showing only sampled token."
-        )
+            scaled = logits / temperature
+            probs = torch.softmax(scaled, dim=-1)
+
+        # ── Top-K candidates ──
+        top_probs, top_indices = torch.topk(probs, k=min(top_k, probs.size(0)))
+        candidates = []
+        for p, idx in zip(top_probs.tolist(), top_indices.tolist()):
+            token_str = _tokenizer.decode([idx])
+            candidates.append({"token": token_str, "prob": round(p, 6)})
+
+        # ── Sample from full distribution ──
+        if temperature <= 0:
+            sampled_idx = logits.argmax().item()
+        else:
+            sampled_idx = torch.multinomial(probs, num_samples=1).item()
+        sampled_token = _tokenizer.decode([sampled_idx])
+
+    except Exception as exc:
+        return jsonify({"error": f"Inference error: {exc}"}), 500
 
     return jsonify({
         "candidates": candidates,
         "sampled": sampled_token,
-        "warning": warning,
+        "warning": None,
     })
 
 
 @app.route("/api/models", methods=["GET"])
 def list_models():
-    """Return available Ollama models for the UI dropdown helper."""
-    try:
-        resp = requests.get(f"{OLLAMA_BASE}/api/tags", timeout=10)
-        resp.raise_for_status()
-        models = [m["name"] for m in resp.json().get("models", [])]
-        return jsonify({"models": models})
-    except Exception as exc:
-        return jsonify({"models": [], "error": str(exc)})
+    """Return the loaded model name."""
+    return jsonify({"models": [DEFAULT_MODEL]})
 
 
 # ---------------------------------------------------------------------------
@@ -157,10 +157,10 @@ def main():
         ║   Next-Token Visualization Demo          ║
         ║   http://localhost:5005                   ║
         ║   Model: {DEFAULT_MODEL:<31s} ║
-        ║   Ollama: {OLLAMA_BASE:<30s} ║
+        ║   Device: {DEVICE:<30s} ║
         ╚══════════════════════════════════════════╝
     """))
-    app.run(host="0.0.0.0", port=5005, debug=True)
+    app.run(host="0.0.0.0", port=5005, debug=True, use_reloader=False)
 
 
 if __name__ == "__main__":
