@@ -350,7 +350,8 @@
 <div id="tab-explorer" class="tab-content">
 
 <div class="mnist-explanation">
-  The same idea as the Digit Classifier, but now applied to text. A language model predicts the next
+  The same idea as the Digit Classifier, but now applied to text. Here, <b>{{ default_model }}</b>
+  (running locally on this computer) predicts the next
   <b>token</b> (word or word-fragment) by scoring every candidate in its vocabulary &mdash; over 50,000
   possibilities instead of just 10. Enter a prompt below, click <b>Start</b>, and you&rsquo;ll see
   which tokens the model thinks are most likely to come next. Click any bar to append that token and repeat.
@@ -414,7 +415,8 @@
 <!-- ══ Chat tab ════════════════════════════════════════════════════ -->
 <div id="tab-chat" class="tab-content active">
   <div class="mnist-explanation">
-    Chat with the language model to see what it can do. Under the hood, the model generates its reply
+    Chat with <b>{{ default_model }}</b>, a language model running locally on this computer.
+    Under the hood, the model generates its reply
     one <b>token</b> (word or word-fragment) at a time &mdash; try the other tabs to see that process up close.
   </div>
   <div class="card">
