@@ -4,6 +4,8 @@ Interactive demo that lets you explore language model predictions **one token at
 
 Enter a prompt, hit **Start**, and the app runs a forward pass through a local model to get the top-K next-token candidates with their probabilities. Click any candidate to append it and see the next distribution — repeat to build text step by step.
 
+Also includes a **Digit Classifier** tab that demonstrates the same input → forward pass → logits → softmax → bar chart pipeline with a small CNN on MNIST (10 output classes instead of 50k+ tokens).
+
 ## Prerequisites
 
 | Requirement | Notes |
@@ -50,7 +52,7 @@ NEXTTOKEN_DEVICE=cpu uv run demo.py
 
 ## UI Controls
 
-The app has two tabs: **Token Explorer** and **Chat**.
+The app has three tabs: **Token Explorer**, **Chat**, and **Digit Classifier**.
 
 ### Token Explorer
 
@@ -68,6 +70,16 @@ A simple multi-turn chat interface that lets you converse with the loaded model.
 - **Max reply tokens** — Cap on generated tokens per reply (1–512)
 - **Temperature** — Sampling temperature for chat responses
 - **Clear Chat** — Reset the conversation history
+
+### Digit Classifier
+
+A hands-on demo of the same pipeline (input → forward pass → logits → softmax → bar chart) using a small CNN on MNIST digits. The model starts with random weights so predictions are initially uniform — train it to see confident results.
+
+- **Train Model** — Train the CNN for 2 epochs on MNIST (~3–5s on CPU). Downloads the dataset (~11 MB) on first run.
+- **Canvas** — Draw a digit (0–9) with your mouse or touchscreen
+- **Classify** — Run the drawn digit through the CNN and display a probability bar chart
+- **Clear** — Reset the canvas
+- **Temperature** — Adjust softmax temperature (same concept as Token Explorer)
 
 ## Troubleshooting
 
@@ -95,7 +107,7 @@ The visualizer replaces leading spaces with `␠` so whitespace is visible. The 
 
 ## How This Was Built
 
-This project was vibe-coded using [Claude Code](https://claude.com/claude-code). The initial project was created from a single prompt similar to [`PROMPT.md`](PROMPT.md) but the original used Ollama instead of HuggingFace. I switched to HuggingFace for easier local testing and broader model compatibility, but the core idea is the same. The Chat tab was also added later, also with Claude Code's help but that is not reflected in this prompt.
+This project was vibe-coded using [Claude Code](https://claude.com/claude-code). The initial project was created from a single prompt similar to [`prompt.md`](prompt.md) but the original used Ollama instead of HuggingFace. I switched to HuggingFace for easier local testing and broader model compatibility, but the core idea is the same. The Chat tab and Digit Classifier tab were added later, also with Claude Code's help but are not reflected in this prompt.
 
 The prompt itself was created by chatgpt (5.2) with a conversation on what i was trying to create. A simple prompt like this would work for a start I think:
 
