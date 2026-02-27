@@ -8,12 +8,18 @@ Run:  uv run demo.py
 Open: http://localhost:5005
 """
 
+import base64
+import io
 import os
 import textwrap
+import threading
 
 import torch
+import torch.nn as nn
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template_string, request
+from PIL import Image
+from torchvision import datasets, transforms
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 load_dotenv()
@@ -77,6 +83,59 @@ def _load_model():
     print("Model loaded.")
 
 _load_model()
+
+# ---------------------------------------------------------------------------
+# MNIST digit classifier
+# ---------------------------------------------------------------------------
+
+class MnistCNN(nn.Module):
+    """Simple 2-layer CNN for MNIST (~60k params)."""
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv2d(1, 16, 3, padding=1)
+        self.conv2 = nn.Conv2d(16, 32, 3, padding=1)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(32 * 7 * 7, 128)
+        self.fc2 = nn.Linear(128, 10)
+
+    def forward(self, x):
+        x = self.pool(torch.relu(self.conv1(x)))   # (B,16,14,14)
+        x = self.pool(torch.relu(self.conv2(x)))    # (B,32,7,7)
+        x = x.view(x.size(0), -1)
+        x = torch.relu(self.fc1(x))
+        return self.fc2(x)
+
+_mnist_model = MnistCNN().to(DEVICE)
+_mnist_trained = False
+_mnist_training = False
+_mnist_lock = threading.Lock()
+
+
+def _preprocess_canvas_image(base64_str):
+    """Decode a base64 data-URL PNG from the canvas into a normalized 28×28 tensor."""
+    if "," in base64_str:
+        base64_str = base64_str.split(",", 1)[1]
+    img_bytes = base64.b64decode(base64_str)
+    img = Image.open(io.BytesIO(img_bytes)).convert("L")
+    transform = transforms.Compose([
+        transforms.Resize((28, 28)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+    ])
+    return transform(img).unsqueeze(0)  # (1,1,28,28)
+
+
+def _image_to_base64_png(tensor_1x1x28x28):
+    """Convert a (1,1,28,28) tensor back to a base64 PNG for preview."""
+    img = tensor_1x1x28x28.squeeze().detach().cpu()
+    # Undo normalization for display
+    img = img * 0.3081 + 0.1307
+    img = (img.clamp(0, 1) * 255).byte().numpy()
+    pil = Image.fromarray(img, mode="L")
+    buf = io.BytesIO()
+    pil.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
 
 # ---------------------------------------------------------------------------
 # HTML template (served inline — single-file simplicity)
@@ -227,6 +286,113 @@ def chat():
 def list_models():
     """Return the loaded model name."""
     return jsonify({"models": [DEFAULT_MODEL]})
+
+
+# ── MNIST endpoints ──────────────────────────────────────────────────────
+
+@app.route("/api/mnist/train", methods=["POST"])
+def mnist_train():
+    """Train the MNIST CNN for 2 epochs. Thread-locked to prevent concurrent runs."""
+    global _mnist_trained, _mnist_training
+
+    with _mnist_lock:
+        if _mnist_training:
+            return jsonify({"error": "Training is already in progress."}), 409
+        _mnist_training = True
+
+    try:
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307,), (0.3081,)),
+        ])
+        train_data = datasets.MNIST("data", train=True, download=True, transform=transform)
+        loader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
+
+        _mnist_model.train()
+        optimizer = torch.optim.Adam(_mnist_model.parameters(), lr=1e-3)
+        criterion = nn.CrossEntropyLoss()
+
+        epochs = 2
+        for epoch in range(epochs):
+            for images, labels in loader:
+                images, labels = images.to(DEVICE), labels.to(DEVICE)
+                optimizer.zero_grad()
+                loss = criterion(_mnist_model(images), labels)
+                loss.backward()
+                optimizer.step()
+
+        # Quick accuracy check on test set
+        _mnist_model.eval()
+        test_data = datasets.MNIST("data", train=False, download=True, transform=transform)
+        test_loader = torch.utils.data.DataLoader(test_data, batch_size=256)
+        correct = total = 0
+        with torch.no_grad():
+            for images, labels in test_loader:
+                images, labels = images.to(DEVICE), labels.to(DEVICE)
+                preds = _mnist_model(images).argmax(dim=1)
+                correct += (preds == labels).sum().item()
+                total += labels.size(0)
+
+        accuracy = round(correct / total, 4)
+        _mnist_trained = True
+
+        return jsonify({"status": "ok", "accuracy": accuracy, "epochs": epochs})
+    except Exception as exc:
+        return jsonify({"error": f"Training error: {exc}"}), 500
+    finally:
+        with _mnist_lock:
+            _mnist_training = False
+
+
+@app.route("/api/classify", methods=["POST"])
+def classify_digit():
+    """
+    Classify a hand-drawn digit from a canvas image.
+
+    Expects JSON: { "image": "<base64 data-URL PNG>", "temperature": 1.0 }
+    Returns JSON: { "probabilities": [{digit, prob}×10], "predicted": 7,
+                     "logits": [...], "preview": "<base64 PNG>", "trained": bool }
+    """
+    body = request.get_json(force=True)
+    image_data = body.get("image", "")
+    temperature = float(body.get("temperature", 1.0))
+
+    if not image_data:
+        return jsonify({"error": "No image data provided."}), 400
+
+    try:
+        tensor = _preprocess_canvas_image(image_data).to(DEVICE)
+        preview = _image_to_base64_png(tensor)
+
+        _mnist_model.eval()
+        with torch.no_grad():
+            logits = _mnist_model(tensor)[0]  # shape: (10,)
+
+        # Temperature scaling + softmax (identical to /api/next-token)
+        if temperature <= 0:
+            probs = torch.zeros_like(logits)
+            probs[logits.argmax()] = 1.0
+        else:
+            scaled = logits / temperature
+            probs = torch.softmax(scaled, dim=-1)
+
+        probabilities = [
+            {"digit": i, "prob": round(p, 6)}
+            for i, p in enumerate(probs.tolist())
+        ]
+        predicted = int(probs.argmax().item())
+        raw_logits = [round(float(v), 4) for v in logits.tolist()]
+
+    except Exception as exc:
+        return jsonify({"error": f"Classification error: {exc}"}), 500
+
+    return jsonify({
+        "probabilities": probabilities,
+        "predicted": predicted,
+        "logits": raw_logits,
+        "preview": preview,
+        "trained": _mnist_trained,
+    })
 
 
 # ---------------------------------------------------------------------------

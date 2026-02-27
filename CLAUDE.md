@@ -15,6 +15,8 @@ Interactive single-page web app that visualizes next-token predictions using a H
 - `POST /api/next-token` — main inference endpoint (`{text, top_k, temperature}` → candidates + sampled token)
 - `POST /api/chat` — chat completion endpoint (`{messages, max_new_tokens, temperature}` → `{reply}`)
 - `GET /api/models` — returns the currently loaded model name
+- `POST /api/classify` — MNIST digit classification (`{image, temperature}` → `{probabilities, predicted, logits, preview, trained}`)
+- `POST /api/mnist/train` — train the MNIST CNN for 2 epochs → `{status, accuracy, epochs}`
 
 ### Inference flow
 
@@ -27,9 +29,13 @@ Interactive single-page web app that visualizes next-token predictions using a H
 
 The model is loaded unconditionally at module level via `_load_model()`. First run downloads the model from HuggingFace Hub (~720 MB for the default model). `use_reloader=False` is set in `app.run()` to prevent Flask's reloader from triggering a second load.
 
+### MNIST digit classifier
+
+The "Digit Classifier" tab demonstrates the same input → forward pass → logits → softmax → bar chart pipeline with only 10 output classes. A small CNN (`MnistCNN`, ~60k params) is instantiated with random weights at startup. Users can classify immediately (seeing random/uniform predictions) and then train the model (2 epochs on MNIST, ~3-5s on CPU) to see confident predictions — illustrating the effect of training. MNIST data downloads on first train (~11 MB) to `data/`.
+
 ## Tech Stack
 
-- Python 3.11+, Flask, torch, transformers
+- Python 3.11+, Flask, torch, torchvision, transformers, Pillow
 - Package management: `uv`
 - Run: `uv run demo.py`
 - No frontend build tools — vanilla HTML/CSS/JS with Jinja2 templating (only `{{ default_model }}`)
@@ -48,6 +54,7 @@ demo.py              # Flask app — model loading, inference, routes, entry poi
 templates/index.html # Single-page UI (HTML + inline CSS + inline JS)
 pyproject.toml       # uv/pip project config
 uv.lock              # Dependency lockfile
+data/                # MNIST dataset cache (auto-downloaded on first train, gitignored)
 README.md            # User-facing setup & troubleshooting
 prompt.md            # Original generation prompt used to create this project
 ```

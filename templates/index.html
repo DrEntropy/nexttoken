@@ -273,6 +273,60 @@
     color: #666;
     margin-top: 0.75rem;
   }
+
+  /* ── MNIST canvas & controls ────────────────────────────────────── */
+  #mnistCanvas {
+    border: 1px solid #2a2d3a;
+    border-radius: 6px;
+    cursor: crosshair;
+    touch-action: none;
+    display: block;
+  }
+  .mnist-layout {
+    display: flex;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .mnist-canvas-col { flex: 0 0 auto; }
+  .mnist-results-col { flex: 1; min-width: 240px; }
+  .mnist-preview {
+    image-rendering: pixelated;
+    border: 1px solid #2a2d3a;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+  }
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .badge-red { background: #3a1515; color: #ff8080; border: 1px solid #e04040; }
+  .badge-green { background: #153a1a; color: #80ff90; border: 1px solid #40e050; }
+  .mnist-bar-label {
+    width: 30px; min-width: 30px;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.9rem;
+    text-align: right;
+    color: #ccc;
+    font-weight: 600;
+  }
+  .mnist-bar-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    margin-bottom: 4px;
+    padding: 3px 6px; border-radius: 6px;
+  }
+  .mnist-explanation {
+    background: #1a1d27;
+    border-left: 3px solid #7c8aff;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    color: #bbb;
+    border-radius: 0 6px 6px 0;
+  }
 </style>
 </head>
 <body>
@@ -282,8 +336,9 @@
 
 <!-- ── Tab bar ─────────────────────────────────────────────────── -->
 <div class="tab-bar">
-  <button class="tab-btn active" onclick="switchTab('explorer')">Token Explorer</button>
-  <button class="tab-btn" onclick="switchTab('chat')">Chat</button>
+  <button class="tab-btn active" data-tab="explorer" onclick="switchTab('explorer')">Token Explorer</button>
+  <button class="tab-btn" data-tab="chat" onclick="switchTab('chat')">Chat</button>
+  <button class="tab-btn" data-tab="mnist" onclick="switchTab('mnist')">Digit Classifier</button>
 </div>
 
 <!-- ══ Token Explorer tab ══════════════════════════════════════════ -->
@@ -373,6 +428,64 @@
     <p class="chat-disclaimer">This is a small model. Responses may be inconsistent or nonsensical.</p>
   </div>
 </div><!-- /tab-chat -->
+
+<!-- ══ Digit Classifier tab ═══════════════════════════════════════ -->
+<div id="tab-mnist" class="tab-content">
+
+<div class="mnist-explanation">
+  Same pipeline as Token Explorer &mdash; <b>input &rarr; forward pass &rarr; logits &rarr; softmax &rarr; bar chart</b>
+  &mdash; but with <b>10 output classes</b> (digits 0-9) instead of 50k+ tokens.
+  Start with the untrained model to see random guesses, then train it and see the difference.
+</div>
+
+<!-- ── Training controls ──────────────────────────────────────── -->
+<div class="card">
+  <h2>Model Training</h2>
+  <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+    <button class="btn-primary" id="btnTrain" onclick="trainMnist()">Train Model</button>
+    <span id="mnistBadge" class="badge badge-red">Untrained</span>
+    <span id="mnistTrainStatus" style="font-size:0.82rem; color:#888;"></span>
+  </div>
+</div>
+
+<!-- ── Drawing + results ──────────────────────────────────────── -->
+<div class="card">
+  <h2>Draw a Digit</h2>
+  <div class="mnist-layout">
+    <div class="mnist-canvas-col">
+      <canvas id="mnistCanvas" width="280" height="280"></canvas>
+      <div class="btn-row">
+        <button class="btn-primary" id="btnClassify" onclick="classifyDigit()">Classify</button>
+        <button class="btn-secondary" onclick="clearCanvas()">Clear</button>
+      </div>
+      <div style="margin-top:0.5rem;">
+        <label for="mnistTemp">Temperature</label>
+        <input type="number" id="mnistTemp" value="1.0" min="0" max="5" step="0.1" style="width:100px;" />
+      </div>
+      <div id="mnistPreviewBox" style="margin-top:0.75rem; display:none;">
+        <span style="font-size:0.78rem; color:#888;">Model sees (28&times;28):</span><br>
+        <img id="mnistPreview" class="mnist-preview" width="84" height="84" />
+      </div>
+    </div>
+
+    <div class="mnist-results-col">
+      <!-- Bar chart -->
+      <div id="mnistChart"><span style="color:#666">Draw a digit and click <b>Classify</b>.</span></div>
+
+      <!-- Model internals -->
+      <div id="mnistInternals" style="display:none;">
+        <div class="function-call">
+          <div class="function-label">raw logits (10 classes)</div>
+          <div id="mnistLogits" class="function-code">[]</div>
+          <div class="function-label">predicted digit</div>
+          <div id="mnistPredicted" class="function-code">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /tab-mnist -->
 
 <!-- ════════════════════════════════════════════════════════════════ -->
 <script>
@@ -556,12 +669,8 @@ function switchTab(tabName) {
   document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
   document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
   document.getElementById("tab-" + tabName).classList.add("active");
-  // Highlight the clicked button
-  const btns = document.querySelectorAll(".tab-btn");
-  btns.forEach(btn => {
-    if (btn.textContent.toLowerCase().includes(tabName === "explorer" ? "token" : "chat")) {
-      btn.classList.add("active");
-    }
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    if (btn.dataset.tab === tabName) btn.classList.add("active");
   });
 }
 
@@ -631,6 +740,152 @@ function clearChat() {
   chatMessages.length = 0;
   renderChatMessages();
   $chatError.innerHTML = "";
+}
+
+// ── MNIST canvas drawing ────────────────────────────────────────
+const mnistCanvas = document.getElementById("mnistCanvas");
+const mnistCtx    = mnistCanvas.getContext("2d");
+let drawing = false;
+
+function initCanvas() {
+  mnistCtx.fillStyle = "#000";
+  mnistCtx.fillRect(0, 0, mnistCanvas.width, mnistCanvas.height);
+}
+initCanvas();
+
+function getCanvasPos(e) {
+  const rect = mnistCanvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return {
+    x: (clientX - rect.left) * (mnistCanvas.width / rect.width),
+    y: (clientY - rect.top) * (mnistCanvas.height / rect.height),
+  };
+}
+
+function startDraw(e) {
+  e.preventDefault();
+  drawing = true;
+  const pos = getCanvasPos(e);
+  mnistCtx.beginPath();
+  mnistCtx.moveTo(pos.x, pos.y);
+}
+
+function moveDraw(e) {
+  if (!drawing) return;
+  e.preventDefault();
+  const pos = getCanvasPos(e);
+  mnistCtx.strokeStyle = "#fff";
+  mnistCtx.lineWidth = 16;
+  mnistCtx.lineCap = "round";
+  mnistCtx.lineJoin = "round";
+  mnistCtx.lineTo(pos.x, pos.y);
+  mnistCtx.stroke();
+}
+
+function stopDraw(e) {
+  if (e) e.preventDefault();
+  drawing = false;
+}
+
+mnistCanvas.addEventListener("mousedown", startDraw);
+mnistCanvas.addEventListener("mousemove", moveDraw);
+mnistCanvas.addEventListener("mouseup", stopDraw);
+mnistCanvas.addEventListener("mouseleave", stopDraw);
+mnistCanvas.addEventListener("touchstart", startDraw);
+mnistCanvas.addEventListener("touchmove", moveDraw);
+mnistCanvas.addEventListener("touchend", stopDraw);
+
+function clearCanvas() {
+  initCanvas();
+  document.getElementById("mnistChart").innerHTML =
+    '<span style="color:#666">Draw a digit and click <b>Classify</b>.</span>';
+  document.getElementById("mnistInternals").style.display = "none";
+  document.getElementById("mnistPreviewBox").style.display = "none";
+}
+
+// ── MNIST classify ──────────────────────────────────────────────
+async function classifyDigit() {
+  const imageData = mnistCanvas.toDataURL("image/png");
+  const temp = parseFloat(document.getElementById("mnistTemp").value);
+  const btn = document.getElementById("btnClassify");
+  btn.disabled = true;
+  btn.textContent = "…";
+
+  try {
+    const resp = await fetch("/api/classify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: imageData, temperature: temp }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+
+    renderMnistChart(data.probabilities);
+
+    // Show model internals
+    const internals = document.getElementById("mnistInternals");
+    internals.style.display = "block";
+    document.getElementById("mnistLogits").textContent =
+      "[" + data.logits.map(v => String(v)).join(", ") + "]";
+    document.getElementById("mnistPredicted").textContent = String(data.predicted);
+
+    // Show preview
+    if (data.preview) {
+      document.getElementById("mnistPreviewBox").style.display = "block";
+      document.getElementById("mnistPreview").src = data.preview;
+    }
+  } catch (err) {
+    document.getElementById("mnistChart").innerHTML =
+      `<div class="error">${escapeHtml(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Classify";
+  }
+}
+
+function renderMnistChart(probabilities) {
+  const maxProb = Math.max(...probabilities.map(p => p.prob));
+  const chart = document.getElementById("mnistChart");
+  chart.innerHTML = probabilities.map(p => {
+    const pct = maxProb > 0 ? (p.prob / maxProb) * 100 : 0;
+    const probStr = (p.prob * 100).toFixed(2) + "%";
+    return `
+      <div class="mnist-bar-row" title="Digit ${p.digit}: ${probStr}">
+        <span class="mnist-bar-label">${p.digit}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <span class="bar-value">${probStr}</span>
+      </div>`;
+  }).join("");
+}
+
+// ── MNIST train ─────────────────────────────────────────────────
+async function trainMnist() {
+  const btn = document.getElementById("btnTrain");
+  const badge = document.getElementById("mnistBadge");
+  const status = document.getElementById("mnistTrainStatus");
+
+  btn.disabled = true;
+  btn.textContent = "Training…";
+  status.innerHTML = '<span class="spinner"></span>Downloading data & training (may take a few seconds)…';
+
+  try {
+    const resp = await fetch("/api/mnist/train", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+
+    badge.className = "badge badge-green";
+    badge.textContent = "Trained";
+    status.textContent = `${data.epochs} epochs — ${(data.accuracy * 100).toFixed(1)}% test accuracy`;
+  } catch (err) {
+    status.innerHTML = `<span class="error" style="display:inline;padding:0.3rem 0.6rem">${escapeHtml(err.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Train Model";
+  }
 }
 </script>
 </body>
