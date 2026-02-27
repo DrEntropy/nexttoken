@@ -443,6 +443,7 @@
   <h2>Model Training</h2>
   <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
     <button class="btn-primary" id="btnTrain" onclick="trainMnist()">Train Model</button>
+    <button class="btn-warning" id="btnResetMnist" onclick="resetMnist()">Reset Model</button>
     <span id="mnistBadge" class="badge badge-red">Untrained</span>
     <span id="mnistTrainStatus" style="font-size:0.82rem; color:#888;"></span>
   </div>
@@ -885,6 +886,30 @@ async function trainMnist() {
   } finally {
     btn.disabled = false;
     btn.textContent = "Train Model";
+  }
+}
+
+async function resetMnist() {
+  const btn = document.getElementById("btnResetMnist");
+  const badge = document.getElementById("mnistBadge");
+  const status = document.getElementById("mnistTrainStatus");
+
+  btn.disabled = true;
+  try {
+    const resp = await fetch("/api/mnist/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+
+    badge.className = "badge badge-red";
+    badge.textContent = "Untrained";
+    status.textContent = "";
+  } catch (err) {
+    status.innerHTML = `<span class="error" style="display:inline;padding:0.3rem 0.6rem">${escapeHtml(err.message)}</span>`;
+  } finally {
+    btn.disabled = false;
   }
 }
 </script>

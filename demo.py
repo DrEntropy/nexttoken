@@ -346,6 +346,18 @@ def mnist_train():
             _mnist_training = False
 
 
+@app.route("/api/mnist/reset", methods=["POST"])
+def mnist_reset():
+    """Re-initialize the MNIST CNN with random weights."""
+    global _mnist_trained
+    with _mnist_lock:
+        if _mnist_training:
+            return jsonify({"error": "Cannot reset while training is in progress."}), 409
+        _mnist_model.apply(lambda m: m.reset_parameters() if hasattr(m, 'reset_parameters') else None)
+        _mnist_trained = False
+    return jsonify({"status": "ok"})
+
+
 @app.route("/api/classify", methods=["POST"])
 def classify_digit():
     """
