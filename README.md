@@ -58,16 +58,7 @@ NEXTTOKEN_DEVICE=cpu uv run demo.py
 
 ## UI Controls
 
-The app has three tabs: **Token Explorer**, **Chat**, and **Digit Classifier**.
-
-### Token Explorer
-
-- **Model** — Shows the loaded model (read-only; change via `NEXTTOKEN_MODEL` env var)
-- **Top-K** — Number of candidate tokens to display (1–50)
-- **Temperature** — Sampling temperature (0.0–2.0; 0 = greedy/deterministic)
-- **Start** — Initialize with the current prompt and fetch first candidates
-- **Greedy** — Auto-pick the highest-probability candidate
-- **Reset** — Clear everything and start over
+The app has three tabs: **Chat**, **Digit Classifier**, and **Token Explorer**.
 
 ### Chat
 
@@ -86,6 +77,15 @@ A hands-on demo of the same idea: draw a digit, the model predicts what it is, a
 - **Classify** — Run the drawn digit through the CNN and display a probability bar chart
 - **Clear** — Reset the canvas
 - **Temperature** — Adjust softmax temperature (same concept as Token Explorer)
+
+### Token Explorer
+
+- **Model** — Shows the loaded model (read-only; change via `NEXTTOKEN_MODEL` env var)
+- **Top-K** — Number of candidate tokens to display (1–50)
+- **Temperature** — Sampling temperature (0.0–2.0; 0 = greedy/deterministic)
+- **Start** — Initialize with the current prompt and fetch first candidates
+- **Greedy** — Auto-pick the highest-probability candidate
+- **Reset** — Clear everything and start over
 
 ## Glossary
 
