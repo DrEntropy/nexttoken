@@ -12,8 +12,11 @@ import os
 import textwrap
 
 import torch
+from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template_string, request
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Configuration
