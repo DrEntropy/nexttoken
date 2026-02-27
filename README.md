@@ -1,10 +1,8 @@
 # Next-Token Visualizer
 
-Interactive demo that lets you explore language model predictions **one token at a time**, powered by [HuggingFace Transformers](https://huggingface.co/docs/transformers).
+Interactive demo that lets you explore how a language model generates text, powered by [HuggingFace Transformers](https://huggingface.co/docs/transformers).
 
-Enter a prompt, hit **Start**, and the app runs the model to get the top-K next-token candidates with their probabilities. Click any candidate to append it and see the next prediction — repeat to build text step by step.
-
-Also includes a **Digit Classifier** tab that demonstrates the same idea — input → model prediction → probabilities → bar chart — using a small neural network on handwritten digits (MNIST). Instead of 50,000+ possible tokens, there are only 10 possible answers (digits 0–9), making it easier to see the full picture.
+The app has three tabs that build on each other. Start by **chatting** with the model to see what it can do. Then try the **Digit Classifier** to see how a simpler model turns an input into probabilities — with only 10 possible answers, you can see the full picture. Finally, open **Token Explorer** to watch the language model predict text one piece at a time, choosing from 50,000+ candidates at each step.
 
 ## What is a token?
 
@@ -58,27 +56,29 @@ NEXTTOKEN_DEVICE=cpu uv run demo.py
 
 ## UI Controls
 
-The app has three tabs: **Chat**, **Digit Classifier**, and **Token Explorer**.
+The three tabs are meant to be explored in order: **Chat → Digit Classifier → Token Explorer**.
 
-### Chat
+### Chat (start here)
 
-A simple multi-turn chat interface that lets you converse with the loaded model. **Requires an instruct-tuned model** (e.g. one with `-Instruct` in the name). If you load a base model, the Chat tab will show an error explaining that a chat template is needed.
+Chat with the model to see what it can do. Under the hood, the model generates its reply one token at a time — the other tabs let you see that process. **Requires an instruct-tuned model** (e.g. one with `-Instruct` in the name).
 
 - **Max reply tokens** — Cap on generated tokens per reply (1–512)
-- **Temperature** — Sampling temperature for chat responses
+- **Temperature** — Controls randomness (0 = predictable, higher = more creative)
 - **Clear Chat** — Reset the conversation history
 
-### Digit Classifier
+### Digit Classifier (peek behind the curtain)
 
-A hands-on demo of the same idea: draw a digit, the model predicts what it is, and you see the probabilities as a bar chart. Uses a small neural network on MNIST handwritten digits (10 possible answers: 0–9). The model starts with random weights so predictions are initially random — train it to see confident, accurate results.
+Now see how a model makes decisions. Draw a digit, and a small neural network scores each possible answer (0–9) and shows the probabilities as a bar chart. With only 10 possible outputs, you can see the full distribution at a glance. The model starts with random weights — train it and watch predictions go from random to confident.
 
 - **Train Model** — Train the CNN for 2 epochs on MNIST (~3–5s on CPU). Downloads the dataset (~11 MB) on first run.
 - **Canvas** — Draw a digit (0–9) with your mouse or touchscreen
 - **Classify** — Run the drawn digit through the CNN and display a probability bar chart
 - **Clear** — Reset the canvas
-- **Temperature** — Adjust softmax temperature (same concept as Token Explorer)
+- **Temperature** — Controls how spread out the probabilities are (same concept as Chat)
 
-### Token Explorer
+### Token Explorer (the full picture)
+
+The same idea as the Digit Classifier, but now applied to text. Enter a prompt and see which tokens the model thinks should come next — except now there are 50,000+ candidates instead of 10. Click any bar to append that token and repeat.
 
 - **Model** — Shows the loaded model (read-only; change via `NEXTTOKEN_MODEL` env var)
 - **Top-K** — Number of candidate tokens to display (1–50)

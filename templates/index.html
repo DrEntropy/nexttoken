@@ -337,7 +337,7 @@
 <body>
 
 <h1><span>&#9654;</span> Next-Token Visualizer</h1>
-<p class="subtitle">Explore how a language model predicts the next piece of text (called a token &mdash; usually a word or word-fragment) one step at a time</p>
+<p class="subtitle">Chat with a language model, see how it makes predictions, and explore text generation one token at a time</p>
 
 <!-- ── Tab bar ─────────────────────────────────────────────────── -->
 <div class="tab-bar">
@@ -350,9 +350,10 @@
 <div id="tab-explorer" class="tab-content">
 
 <div class="mnist-explanation">
-  A language model predicts text by choosing one <b>token</b> at a time. A token is usually a word
-  or part of a word &mdash; for example, &ldquo;prediction&rdquo; might be split into &ldquo;predict&rdquo; + &ldquo;ion&rdquo;.
-  Enter a prompt below, click <b>Start</b>, and you&rsquo;ll see which tokens the model thinks are most likely to come next.
+  The same idea as the Digit Classifier, but now applied to text. A language model predicts the next
+  <b>token</b> (word or word-fragment) by scoring every candidate in its vocabulary &mdash; over 50,000
+  possibilities instead of just 10. Enter a prompt below, click <b>Start</b>, and you&rsquo;ll see
+  which tokens the model thinks are most likely to come next. Click any bar to append that token and repeat.
 </div>
 
 <!-- ── Prompt input ────────────────────────────────────────────── -->
@@ -412,6 +413,10 @@
 
 <!-- ══ Chat tab ════════════════════════════════════════════════════ -->
 <div id="tab-chat" class="tab-content active">
+  <div class="mnist-explanation">
+    Chat with the language model to see what it can do. Under the hood, the model generates its reply
+    one <b>token</b> (word or word-fragment) at a time &mdash; try the other tabs to see that process up close.
+  </div>
   <div class="card">
     <h2>Chat Settings</h2>
     <div class="chat-settings">
@@ -438,7 +443,7 @@
       <button class="btn-warning" onclick="clearChat()">Clear Chat</button>
     </div>
     <div id="chatError"></div>
-    <p class="chat-disclaimer">The model generates replies one token at a time, just like Token Explorer. This is a small model &mdash; responses may be inconsistent or nonsensical.</p>
+    <p class="chat-disclaimer">This is a small model &mdash; responses may be inconsistent or nonsensical. Try the Digit Classifier and Token Explorer tabs to see how the model makes its predictions.</p>
   </div>
 </div><!-- /tab-chat -->
 
@@ -446,15 +451,15 @@
 <div id="tab-mnist" class="tab-content">
 
 <div class="mnist-explanation">
-  This tab uses a <b>separate, smaller model</b> (~60,000 parameters) to classify hand-drawn digits.
-  It follows the same process as Token Explorer: the model receives an input (your drawing),
-  produces a raw score (<b>logit</b>) for each possible answer, then converts those scores into
-  probabilities (using a function called <b>softmax</b>). Instead of 50,000+ possible tokens,
-  there are only <b>10 possible answers</b> (digits 0&ndash;9).
+  Now peek behind the curtain. This tab uses a <b>small neural network</b> (~60,000 parameters) to classify
+  hand-drawn digits. The model receives your drawing, produces a raw score (<b>logit</b>) for each possible
+  answer, then converts those scores into probabilities (using a function called <b>softmax</b>).
+  With only <b>10 possible answers</b> (digits 0&ndash;9), you can see the full distribution at a glance.
   <br><br>
-  <b>MNIST</b> is a classic dataset of 70,000 handwritten digits. The model starts with random
-  weights, so predictions are initially random &mdash; click <b>Train Model</b> to train it and
-  see how predictions become confident and accurate.
+  The model starts with <b>random weights</b>, so predictions are initially random &mdash; click
+  <b>Train Model</b> to train it on <b>MNIST</b> (a classic dataset of 70,000 handwritten digits)
+  and watch predictions become confident and accurate. Then try the <b>Token Explorer</b> tab
+  to see the same process applied to text, with 50,000+ possible tokens instead of 10.
 </div>
 
 <!-- ── Training controls ──────────────────────────────────────── -->
