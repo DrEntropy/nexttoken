@@ -103,4 +103,6 @@ The prompt itself was created by chatgpt (5.2) with a conversation on what i was
 create a prompt for a coding agent like Claude Code to create a demo using flask and huggingface with probability bars and the ability of the user to select a token on the graph and then the next token appears and so on. Default model SmolLM2-360M-Instruct. Use uv for package management, keep it to a single-file backend and single HTML template. Include a CLAUDE.md for AI-assisted development context.
 ```
 
+Note added 2025-02-27: The above applies to the version tagged `v0.1.0`. The current `main` branch has diverged a bit since then.
+
 
