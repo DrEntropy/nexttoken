@@ -2,9 +2,15 @@
 
 Interactive demo that lets you explore language model predictions **one token at a time**, powered by [HuggingFace Transformers](https://huggingface.co/docs/transformers).
 
-Enter a prompt, hit **Start**, and the app runs a forward pass through a local model to get the top-K next-token candidates with their probabilities. Click any candidate to append it and see the next distribution — repeat to build text step by step.
+Enter a prompt, hit **Start**, and the app runs the model to get the top-K next-token candidates with their probabilities. Click any candidate to append it and see the next prediction — repeat to build text step by step.
 
-Also includes a **Digit Classifier** tab that demonstrates the same input → forward pass → logits → softmax → bar chart pipeline with a small CNN on MNIST (10 output classes instead of 50k+ tokens).
+Also includes a **Digit Classifier** tab that demonstrates the same idea — input → model prediction → probabilities → bar chart — using a small neural network on handwritten digits (MNIST). Instead of 50,000+ possible tokens, there are only 10 possible answers (digits 0–9), making it easier to see the full picture.
+
+## What is a token?
+
+A **token** is the basic unit a language model works with. It's usually a word or part of a word — for example, the word "prediction" might be split into two tokens: "predict" and "ion". Common short words like "the" or "is" are typically one token each.
+
+When you type a prompt, the model's **tokenizer** splits your text into tokens and converts each one to a number (called a **token ID**). The model processes these numbers and produces a probability for every possible next token. The bar chart shows the highest-probability candidates — clicking one appends it to your text and repeats the process.
 
 ## Prerequisites
 
@@ -73,13 +79,27 @@ A simple multi-turn chat interface that lets you converse with the loaded model.
 
 ### Digit Classifier
 
-A hands-on demo of the same pipeline (input → forward pass → logits → softmax → bar chart) using a small CNN on MNIST digits. The model starts with random weights so predictions are initially uniform — train it to see confident results.
+A hands-on demo of the same idea: draw a digit, the model predicts what it is, and you see the probabilities as a bar chart. Uses a small neural network on MNIST handwritten digits (10 possible answers: 0–9). The model starts with random weights so predictions are initially random — train it to see confident, accurate results.
 
 - **Train Model** — Train the CNN for 2 epochs on MNIST (~3–5s on CPU). Downloads the dataset (~11 MB) on first run.
 - **Canvas** — Draw a digit (0–9) with your mouse or touchscreen
 - **Classify** — Run the drawn digit through the CNN and display a probability bar chart
 - **Clear** — Reset the canvas
 - **Temperature** — Adjust softmax temperature (same concept as Token Explorer)
+
+## Glossary
+
+| Term | Definition |
+|---|---|
+| **Token** | A word or word-fragment — the basic unit a language model reads and generates |
+| **Tokenizer** | Converts text into a list of token IDs (numbers) that the model can process |
+| **Logits** | Raw scores the model outputs for each possible next token — higher means more likely |
+| **Softmax** | A function that converts logits into probabilities that sum to 1 (0–100%) |
+| **Temperature** | Controls randomness: 0 = always pick the most likely token, higher = more random/creative |
+| **Top-K** | How many of the highest-probability candidates to show |
+| **Forward pass** | One run of the model: feed in tokens, get out logits |
+| **Greedy** | Picking the single most likely token at each step (temperature = 0 has the same effect) |
+| **MNIST** | A classic dataset of 70,000 handwritten digit images (0–9), used to train and test classifiers |
 
 ## Troubleshooting
 

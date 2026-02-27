@@ -327,12 +327,17 @@
     color: #bbb;
     border-radius: 0 6px 6px 0;
   }
+  .helper-text {
+    font-size: 0.75rem;
+    color: #777;
+    margin-top: 0.2rem;
+  }
 </style>
 </head>
 <body>
 
 <h1><span>&#9654;</span> Next-Token Visualizer</h1>
-<p class="subtitle">Explore language model predictions one token at a time &mdash; powered by HuggingFace Transformers</p>
+<p class="subtitle">Explore how a language model predicts the next piece of text (called a token &mdash; usually a word or word-fragment) one step at a time</p>
 
 <!-- ── Tab bar ─────────────────────────────────────────────────── -->
 <div class="tab-bar">
@@ -343,6 +348,12 @@
 
 <!-- ══ Token Explorer tab ══════════════════════════════════════════ -->
 <div id="tab-explorer" class="tab-content active">
+
+<div class="mnist-explanation">
+  A language model predicts text by choosing one <b>token</b> at a time. A token is usually a word
+  or part of a word &mdash; for example, &ldquo;prediction&rdquo; might be split into &ldquo;predict&rdquo; + &ldquo;ion&rdquo;.
+  Enter a prompt below, click <b>Start</b>, and you&rsquo;ll see which tokens the model thinks are most likely to come next.
+</div>
 
 <!-- ── Prompt input ────────────────────────────────────────────── -->
 <div class="card">
@@ -360,16 +371,18 @@
     </div>
     <div>
       <label for="topK">Top-K</label>
-      <input type="number" id="topK" value="10" min="1" max="50" />
+      <input type="number" id="topK" value="10" min="1" max="50" title="How many candidate tokens to show in the bar chart" />
+      <div class="helper-text">How many candidates to show</div>
     </div>
     <div>
       <label for="temperature">Temperature</label>
-      <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1" />
+      <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1" title="Controls randomness: 0 = always pick the most likely token, higher = more random" />
+      <div class="helper-text">0 = predictable, higher = more random</div>
     </div>
   </div>
   <div class="btn-row">
-    <button class="btn-primary" id="btnStart" onclick="startSession()">Start</button>
-    <button class="btn-secondary" id="btnGreedy" onclick="greedyPick()" disabled>Greedy</button>
+    <button class="btn-primary" id="btnStart" onclick="startSession()" title="Send the prompt to the model and see its predictions">Start</button>
+    <button class="btn-secondary" id="btnGreedy" onclick="greedyPick()" disabled title="Automatically pick the highest-probability token (same as clicking the top bar)">Greedy</button>
     <button class="btn-warning" id="btnReset" onclick="resetSession()">Reset</button>
   </div>
   <div id="status"></div>
@@ -380,16 +393,16 @@
   <h2>Current Text</h2>
   <div id="currentText"></div>
   <div class="function-call">
-    <div class="function-label">show tokenizer output (`inputs`)</div>
+    <div class="function-label" title="The tokenizer converts your text into a list of token IDs — numbers the model uses internally to represent words and word-fragments">Tokenizer output &mdash; your text converted to token IDs (numbers the model understands)</div>
     <div id="inputsPreview" class="function-code">[]</div>
-    <div class="function-label"><code>logits = model(inputs)</code></div>
+    <div class="function-label" title="The model produces a raw score (logit) for every possible next token. Higher scores mean the model thinks that token is more likely."><code>logits = model(inputs)</code> &mdash; raw scores for every possible next token</div>
     <div id="logitsPreview" class="function-code">[]</div>
   </div>
 </div>
 
 <!-- ── Visualization ───────────────────────────────────────────── -->
 <div class="card">
-  <h2>Next-Token Candidates</h2>
+  <h2 title="Each bar shows a possible next token and how likely the model thinks it is. Click any bar to append that token.">Next-Token Candidates</h2>
   <div id="warning"></div>
   <div id="errorBox"></div>
   <div id="chart"><span style="color:#666">Press <b>Start</b> to begin.</span></div>
@@ -404,11 +417,11 @@
     <div class="chat-settings">
       <div>
         <label for="chatMaxTokens">Max reply tokens</label>
-        <input type="number" id="chatMaxTokens" value="200" min="1" max="512" />
+        <input type="number" id="chatMaxTokens" value="200" min="1" max="512" title="Maximum number of tokens (words/word-fragments) the model will generate in its reply" />
       </div>
       <div>
         <label for="chatTemperature">Temperature</label>
-        <input type="number" id="chatTemperature" value="0.7" min="0" max="2" step="0.1" />
+        <input type="number" id="chatTemperature" value="0.7" min="0" max="2" step="0.1" title="Controls randomness: 0 = always pick the most likely token, higher = more random" />
       </div>
     </div>
   </div>
@@ -425,7 +438,7 @@
       <button class="btn-warning" onclick="clearChat()">Clear Chat</button>
     </div>
     <div id="chatError"></div>
-    <p class="chat-disclaimer">This is a small model. Responses may be inconsistent or nonsensical.</p>
+    <p class="chat-disclaimer">The model generates replies one token at a time, just like Token Explorer. This is a small model &mdash; responses may be inconsistent or nonsensical.</p>
   </div>
 </div><!-- /tab-chat -->
 
@@ -433,17 +446,23 @@
 <div id="tab-mnist" class="tab-content">
 
 <div class="mnist-explanation">
-  Same pipeline as Token Explorer &mdash; <b>input &rarr; forward pass &rarr; logits &rarr; softmax &rarr; bar chart</b>
-  &mdash; but with <b>10 output classes</b> (digits 0-9) instead of 50k+ tokens.
-  Start with the untrained model to see random guesses, then train it and see the difference.
+  This tab uses a <b>separate, smaller model</b> (~60,000 parameters) to classify hand-drawn digits.
+  It follows the same process as Token Explorer: the model receives an input (your drawing),
+  produces a raw score (<b>logit</b>) for each possible answer, then converts those scores into
+  probabilities (using a function called <b>softmax</b>). Instead of 50,000+ possible tokens,
+  there are only <b>10 possible answers</b> (digits 0&ndash;9).
+  <br><br>
+  <b>MNIST</b> is a classic dataset of 70,000 handwritten digits. The model starts with random
+  weights, so predictions are initially random &mdash; click <b>Train Model</b> to train it and
+  see how predictions become confident and accurate.
 </div>
 
 <!-- ── Training controls ──────────────────────────────────────── -->
 <div class="card">
   <h2>Model Training</h2>
   <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
-    <button class="btn-primary" id="btnTrain" onclick="trainMnist()">Train Model</button>
-    <button class="btn-warning" id="btnResetMnist" onclick="resetMnist()">Reset Model</button>
+    <button class="btn-primary" id="btnTrain" onclick="trainMnist()" title="Train the model for 2 epochs on 70,000 handwritten digits (~3-5 seconds)">Train Model</button>
+    <button class="btn-warning" id="btnResetMnist" onclick="resetMnist()" title="Reset the model to random weights so predictions are random again">Reset Model</button>
     <span id="mnistBadge" class="badge badge-red">Untrained</span>
     <span id="mnistTrainStatus" style="font-size:0.82rem; color:#888;"></span>
   </div>
@@ -456,12 +475,12 @@
     <div class="mnist-canvas-col">
       <canvas id="mnistCanvas" width="280" height="280"></canvas>
       <div class="btn-row">
-        <button class="btn-primary" id="btnClassify" onclick="classifyDigit()">Classify</button>
+        <button class="btn-primary" id="btnClassify" onclick="classifyDigit()" title="Send your drawing to the model and see which digit it thinks you drew">Classify</button>
         <button class="btn-secondary" onclick="clearCanvas()">Clear</button>
       </div>
       <div style="margin-top:0.5rem;">
         <label for="mnistTemp">Temperature</label>
-        <input type="number" id="mnistTemp" value="1.0" min="0" max="5" step="0.1" style="width:100px;" />
+        <input type="number" id="mnistTemp" value="1.0" min="0" max="5" step="0.1" style="width:100px;" title="Controls how spread out the probabilities are: lower = more confident, higher = more uniform" />
       </div>
       <div id="mnistPreviewBox" style="margin-top:0.75rem; display:none;">
         <span style="font-size:0.78rem; color:#888;">Model sees (28&times;28):</span><br>
@@ -476,7 +495,7 @@
       <!-- Model internals -->
       <div id="mnistInternals" style="display:none;">
         <div class="function-call">
-          <div class="function-label">raw logits (10 classes)</div>
+          <div class="function-label" title="The model outputs one raw score per digit (0-9). These scores are converted to probabilities using softmax.">Raw logits &mdash; one score per digit, before converting to probabilities</div>
           <div id="mnistLogits" class="function-code">[]</div>
           <div class="function-label">predicted digit</div>
           <div id="mnistPredicted" class="function-code">-</div>
@@ -612,7 +631,7 @@ async function queryAndRender() {
     renderText();
     if (data.warning) showWarning(data.warning);
     renderChart();
-    setStatus("Click a token to continue, or press Greedy.", false);
+    setStatus("Click any bar to append that token, or press Greedy to auto-pick the top one.", false);
   } catch (err) {
     showError(err.message);
     setStatus("Error — see details above.", false);
