@@ -93,6 +93,27 @@
     border: 1px solid #2a2d3a;
     color: #e0e0e0;
   }
+  .function-call {
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
+    border-top: 1px dashed #2a2d3a;
+  }
+  .function-label {
+    font-size: 0.8rem;
+    color: #9aa1bd;
+    margin-bottom: 0.3rem;
+  }
+  .function-code {
+    background: #12141c;
+    border: 1px solid #2a2d3a;
+    border-radius: 6px;
+    padding: 0.55rem 0.65rem;
+    margin-bottom: 0.7rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.82rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
 
   /* ── Bar chart ─────────────────────────────────────────────────── */
   #chart { min-height: 60px; }
@@ -303,6 +324,12 @@
 <div class="card">
   <h2>Current Text</h2>
   <div id="currentText"></div>
+  <div class="function-call">
+    <div class="function-label">show tokenizer output (`inputs`)</div>
+    <div id="inputsPreview" class="function-code">[]</div>
+    <div class="function-label"><code>logits = model(inputs)</code></div>
+    <div id="logitsPreview" class="function-code">[]</div>
+  </div>
 </div>
 
 <!-- ── Visualization ───────────────────────────────────────────── -->
@@ -366,6 +393,11 @@ const $error     = document.getElementById("errorBox");
 const $status    = document.getElementById("status");
 const $btnStart  = document.getElementById("btnStart");
 const $btnGreedy = document.getElementById("btnGreedy");
+const $inputs    = document.getElementById("inputsPreview");
+const $logits    = document.getElementById("logitsPreview");
+
+let inputPreview = [];
+let logitsPreview = [];
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -411,6 +443,13 @@ async function fetchNextToken(text) {
 
 function renderText() {
   $text.textContent = currentText;
+  $inputs.textContent = formatList(inputPreview);
+  $logits.textContent = formatList(logitsPreview);
+}
+
+function formatList(values) {
+  if (!Array.isArray(values) || values.length === 0) return "[]";
+  return "[" + values.map(v => String(v)).join(", ") + "]";
 }
 
 function renderChart() {
@@ -454,6 +493,9 @@ async function queryAndRender() {
   try {
     const data = await fetchNextToken(currentText);
     candidates = data.candidates || [];
+    inputPreview = data.inputs || [];
+    logitsPreview = data.logits || [];
+    renderText();
     if (data.warning) showWarning(data.warning);
     renderChart();
     setStatus("Click a token to continue, or press Greedy.", false);
@@ -461,6 +503,9 @@ async function queryAndRender() {
     showError(err.message);
     setStatus("Error — see details above.", false);
     candidates = [];
+    inputPreview = [];
+    logitsPreview = [];
+    renderText();
     renderChart();
   } finally {
     busy = false;
@@ -495,6 +540,8 @@ async function greedyPick() {
 function resetSession() {
   currentText = "";
   candidates  = [];
+  inputPreview = [];
+  logitsPreview = [];
   renderText();
   renderChart();
   showWarning("");

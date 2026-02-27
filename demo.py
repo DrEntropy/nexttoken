@@ -44,6 +44,25 @@ DEVICE = _resolve_device(DEVICE_OVERRIDE)
 _tokenizer = None
 _model = None
 
+
+def _abbreviate_tensor(tensor: torch.Tensor, head: int = 6, tail: int = 3, digits: int = 4):
+    """
+    Return an abbreviated list representation:
+      [a, b, c, ..., y, z]
+    """
+    flat = tensor.detach().cpu().flatten()
+    total = flat.numel()
+    def _format_number(value: float):
+        if digits == 0:
+            return int(round(float(value)))
+        return round(float(value), digits)
+
+    if total <= head + tail:
+        return [_format_number(v) for v in flat.tolist()]
+    start = [_format_number(v) for v in flat[:head].tolist()]
+    end = [_format_number(v) for v in flat[-tail:].tolist()]
+    return start + ["..."] + end
+
 def _load_model():
     global _tokenizer, _model
     dtype = torch.float32 if DEVICE == "cpu" else torch.float16
@@ -137,6 +156,8 @@ def next_token():
     return jsonify({
         "candidates": candidates,
         "sampled": sampled_token,
+        "inputs": _abbreviate_tensor(inputs["input_ids"][0], digits=0),
+        "logits": _abbreviate_tensor(logits),
         "warning": None,
     })
 
