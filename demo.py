@@ -305,6 +305,7 @@ def mnist_train():
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,)),
         ])
+        print("Loading MNIST training data…")
         train_data = datasets.MNIST("data", train=True, download=True, transform=transform)
         loader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
 
@@ -314,6 +315,7 @@ def mnist_train():
 
         epochs = 2
         for epoch in range(epochs):
+            print(f"Epoch {epoch+1}/{epochs}...")
             for images, labels in loader:
                 images, labels = images.to(DEVICE), labels.to(DEVICE)
                 optimizer.zero_grad()
