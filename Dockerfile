@@ -13,8 +13,9 @@ COPY demo.py .
 COPY templates/ templates/
 
 # Pre-download MNIST dataset (~11 MB) so training doesn't need network access
-ENV NEXTTOKEN_MNIST_DATA=/data/mnist
-RUN python -c "from torchvision import datasets; datasets.MNIST('/data/mnist', train=True, download=True); datasets.MNIST('/data/mnist', train=False, download=True)"
+# Stored outside /data so it isn't shadowed by the Fly volume mount
+RUN python -c "from torchvision import datasets; datasets.MNIST('/mnist', train=True, download=True); datasets.MNIST('/mnist', train=False, download=True)"
+ENV NEXTTOKEN_MNIST_DATA=/mnist
 
 # Model weights download to this volume on first run
 ENV HF_HOME=/data/huggingface
