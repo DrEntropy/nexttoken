@@ -274,27 +274,47 @@
     margin-top: 0.75rem;
   }
 
-  /* ── MNIST canvas & controls ────────────────────────────────────── */
-  #mnistCanvas {
+  /* ── 2D Classifier ──────────────────────────────────────────────── */
+  #classifierCanvas {
     border: 1px solid #2a2d3a;
     border-radius: 6px;
     cursor: crosshair;
-    touch-action: none;
     display: block;
   }
-  .mnist-layout {
+  .classifier-layout {
     display: flex;
     gap: 1.25rem;
     flex-wrap: wrap;
     align-items: flex-start;
   }
-  .mnist-canvas-col { flex: 0 0 auto; }
-  .mnist-results-col { flex: 1; min-width: 240px; }
-  .mnist-preview {
-    image-rendering: pixelated;
-    border: 1px solid #2a2d3a;
-    border-radius: 4px;
+  .classifier-plot-col { flex: 0 0 auto; }
+  .classifier-results-col { flex: 1; min-width: 240px; }
+  .classifier-bar-label {
+    width: 70px; min-width: 70px;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.9rem;
+    text-align: right;
+    color: #ccc;
+    font-weight: 600;
+  }
+  .classifier-bar-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    margin-bottom: 4px;
+    padding: 3px 6px; border-radius: 6px;
+  }
+  .classifier-legend {
+    display: flex;
+    gap: 1rem;
     margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: #aaa;
+  }
+  .legend-dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 0.3rem;
+    vertical-align: middle;
   }
   .badge {
     display: inline-block;
@@ -305,20 +325,7 @@
   }
   .badge-red { background: #3a1515; color: #ff8080; border: 1px solid #e04040; }
   .badge-green { background: #153a1a; color: #80ff90; border: 1px solid #40e050; }
-  .mnist-bar-label {
-    width: 30px; min-width: 30px;
-    font-family: "JetBrains Mono", "Fira Code", monospace;
-    font-size: 0.9rem;
-    text-align: right;
-    color: #ccc;
-    font-weight: 600;
-  }
-  .mnist-bar-row {
-    display: flex; align-items: center; gap: 0.5rem;
-    margin-bottom: 4px;
-    padding: 3px 6px; border-radius: 6px;
-  }
-  .mnist-explanation {
+  .classifier-explanation {
     background: #1a1d27;
     border-left: 3px solid #7c8aff;
     padding: 0.75rem 1rem;
@@ -342,18 +349,18 @@
 <!-- ── Tab bar ─────────────────────────────────────────────────── -->
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="chat" onclick="switchTab('chat')">Chat</button>
-  <button class="tab-btn" data-tab="mnist" onclick="switchTab('mnist')">Digit Classifier</button>
+  <button class="tab-btn" data-tab="classifier" onclick="switchTab('classifier')">2D Classifier</button>
   <button class="tab-btn" data-tab="explorer" onclick="switchTab('explorer')">Token Explorer</button>
 </div>
 
 <!-- ══ Token Explorer tab ══════════════════════════════════════════ -->
 <div id="tab-explorer" class="tab-content">
 
-<div class="mnist-explanation">
-  The same idea as the Digit Classifier, but now applied to text. Here, <b>{{ default_model }}</b>
+<div class="classifier-explanation">
+  The same idea as the 2D Classifier, but now applied to text. Here, <b>{{ default_model }}</b>
   (running locally on this computer) predicts the next
   <b>token</b> (word or word-fragment) by scoring every candidate in its vocabulary &mdash; over 50,000
-  possibilities instead of just 10. Enter a prompt below, click <b>Start</b>, and you&rsquo;ll see
+  possibilities instead of just 2. Enter a prompt below, click <b>Start</b>, and you&rsquo;ll see
   which tokens the model thinks are most likely to come next. Click any bar to append that token and repeat.
 </div>
 
@@ -414,7 +421,7 @@
 
 <!-- ══ Chat tab ════════════════════════════════════════════════════ -->
 <div id="tab-chat" class="tab-content active">
-  <div class="mnist-explanation">
+  <div class="classifier-explanation">
     Chat with <b>{{ default_model }}</b>, a language model running locally on this computer.
     Under the hood, the model generates its reply
     one <b>token</b> (word or word-fragment) at a time &mdash; try the other tabs to see that process up close.
@@ -445,74 +452,72 @@
       <button class="btn-warning" onclick="clearChat()">Clear Chat</button>
     </div>
     <div id="chatError"></div>
-    <p class="chat-disclaimer">This is a small model &mdash; responses may be inconsistent or nonsensical. Try the Digit Classifier and Token Explorer tabs to see how the model makes its predictions.</p>
+    <p class="chat-disclaimer">This is a small model &mdash; responses may be inconsistent or nonsensical. Try the 2D Classifier and Token Explorer tabs to see how the model makes its predictions.</p>
   </div>
 </div><!-- /tab-chat -->
 
-<!-- ══ Digit Classifier tab ═══════════════════════════════════════ -->
-<div id="tab-mnist" class="tab-content">
+<!-- ══ 2D Classifier tab ═══════════════════════════════════════════ -->
+<div id="tab-classifier" class="tab-content">
 
-<div class="mnist-explanation">
-  Now peek behind the curtain. This tab uses a <b>small neural network</b> (~60,000 parameters) to classify
-  hand-drawn digits. The model receives your drawing, produces a raw score (<b>logit</b>) for each possible
-  answer, then converts those scores into probabilities (using a function called <b>softmax</b>).
-  With only <b>10 possible answers</b> (digits 0&ndash;9), you can see the full distribution at a glance.
+<div class="classifier-explanation">
+  Peek behind the curtain. This tab uses a <b>logistic regression</b> model (just <b>6 parameters</b>:
+  2 weights + 1 bias per class) to classify 2D points into two categories. The model receives an
+  (x, y) coordinate, produces a raw score (<b>logit</b>) for each class, then converts those scores
+  into probabilities using <b>softmax</b>. The dashed line shows the <b>decision boundary</b> &mdash;
+  where the model is exactly 50/50.
   <br><br>
-  The model starts with <b>random weights</b>, so predictions are initially random &mdash; click
-  <b>Train Model</b> to train it on <b>MNIST</b> (a classic dataset of 70,000 handwritten digits)
-  and watch predictions become confident and accurate. Then try the <b>Token Explorer</b> tab
-  to see the same process applied to text, with 50,000+ possible tokens instead of 10.
+  The model starts with <b>random weights</b>, so the boundary is arbitrary &mdash; click
+  <b>Train Model</b> to fit it to the data (instant, 200 steps of SGD) and watch the boundary
+  snap into place. Then try the <b>Token Explorer</b> tab to see the same process applied to text,
+  with 50,000+ possible tokens instead of 2.
 </div>
 
 <!-- ── Training controls ──────────────────────────────────────── -->
 <div class="card">
   <h2>Model Training</h2>
   <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
-    <button class="btn-primary" id="btnTrain" onclick="trainMnist()" title="Train the model for 2 epochs on 70,000 handwritten digits (~3-5 seconds)">Train Model</button>
-    <button class="btn-warning" id="btnResetMnist" onclick="resetMnist()" title="Reset the model to random weights so predictions are random again">Reset Model</button>
-    <span id="mnistBadge" class="badge badge-red">Untrained</span>
-    <span id="mnistTrainStatus" style="font-size:0.82rem; color:#888;"></span>
+    <button class="btn-primary" id="btnTrain" onclick="trainClassifier()" title="Train the model for 200 SGD steps on the synthetic data (instant)">Train Model</button>
+    <button class="btn-warning" id="btnResetClassifier" onclick="resetClassifier()" title="Reset the model to random weights so predictions are random again">Reset Model</button>
+    <span id="classifierBadge" class="badge badge-red">Untrained</span>
+    <span id="classifierTrainStatus" style="font-size:0.82rem; color:#888;"></span>
   </div>
 </div>
 
-<!-- ── Drawing + results ──────────────────────────────────────── -->
+<!-- ── Scatter plot + results ──────────────────────────────────── -->
 <div class="card">
-  <h2>Draw a Digit</h2>
-  <div class="mnist-layout">
-    <div class="mnist-canvas-col">
-      <canvas id="mnistCanvas" width="280" height="280"></canvas>
-      <div class="btn-row">
-        <button class="btn-primary" id="btnClassify" onclick="classifyDigit()" title="Send your drawing to the model and see which digit it thinks you drew">Classify</button>
-        <button class="btn-secondary" onclick="clearCanvas()">Clear</button>
+  <h2>Click to Classify a Point</h2>
+  <div class="classifier-layout">
+    <div class="classifier-plot-col">
+      <canvas id="classifierCanvas" width="360" height="360"></canvas>
+      <div class="classifier-legend">
+        <span><span class="legend-dot" style="background:#e05555;"></span>Class A</span>
+        <span><span class="legend-dot" style="background:#44bbaa;"></span>Class B</span>
+        <span style="color:#777;">&#x2500;&#x2500; boundary</span>
       </div>
       <div style="margin-top:0.5rem;">
-        <label for="mnistTemp">Temperature</label>
-        <input type="number" id="mnistTemp" value="1.0" min="0" max="5" step="0.1" style="width:100px;" title="Controls how spread out the probabilities are: lower = more confident, higher = more uniform" />
-      </div>
-      <div id="mnistPreviewBox" style="margin-top:0.75rem; display:none;">
-        <span style="font-size:0.78rem; color:#888;">Model sees (28&times;28):</span><br>
-        <img id="mnistPreview" class="mnist-preview" width="84" height="84" />
+        <label for="classifierTemp">Temperature</label>
+        <input type="number" id="classifierTemp" value="1.0" min="0" max="5" step="0.1" style="width:100px;" title="Controls how spread out the probabilities are: lower = more confident, higher = more uniform" />
       </div>
     </div>
 
-    <div class="mnist-results-col">
+    <div class="classifier-results-col">
       <!-- Bar chart -->
-      <div id="mnistChart"><span style="color:#666">Draw a digit and click <b>Classify</b>.</span></div>
+      <div id="classifierChart"><span style="color:#666">Click on the plot to classify a point.</span></div>
 
       <!-- Model internals -->
-      <div id="mnistInternals" style="display:none;">
+      <div id="classifierInternals" style="display:none;">
         <div class="function-call">
-          <div class="function-label" title="The model outputs one raw score per digit (0-9). These scores are converted to probabilities using softmax.">Raw logits &mdash; one score per digit, before converting to probabilities</div>
-          <div id="mnistLogits" class="function-code">[]</div>
-          <div class="function-label">predicted digit</div>
-          <div id="mnistPredicted" class="function-code">-</div>
+          <div class="function-label" title="The model outputs one raw score per class. These scores are converted to probabilities using softmax.">Raw logits &mdash; one score per class, before converting to probabilities</div>
+          <div id="classifierLogits" class="function-code">[]</div>
+          <div class="function-label">predicted class</div>
+          <div id="classifierPredicted" class="function-code">-</div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-</div><!-- /tab-mnist -->
+</div><!-- /tab-classifier -->
 
 <!-- ════════════════════════════════════════════════════════════════ -->
 <script>
@@ -769,177 +774,217 @@ function clearChat() {
   $chatError.innerHTML = "";
 }
 
-// ── MNIST canvas drawing ────────────────────────────────────────
-const mnistCanvas = document.getElementById("mnistCanvas");
-const mnistCtx    = mnistCanvas.getContext("2d");
-let drawing = false;
+// ── 2D Classifier ───────────────────────────────────────────────
+const CLS_CANVAS_SIZE = 360;
+const CLS_DATA_MIN = -4;
+const CLS_DATA_MAX = 4;
+const CLS_DATA_RANGE = CLS_DATA_MAX - CLS_DATA_MIN;
 
-function initCanvas() {
-  mnistCtx.fillStyle = "#000";
-  mnistCtx.fillRect(0, 0, mnistCanvas.width, mnistCanvas.height);
-}
-initCanvas();
+const clsCanvas = document.getElementById("classifierCanvas");
+const clsCtx    = clsCanvas.getContext("2d");
 
-function getCanvasPos(e) {
-  const rect = mnistCanvas.getBoundingClientRect();
-  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-  return {
-    x: (clientX - rect.left) * (mnistCanvas.width / rect.width),
-    y: (clientY - rect.top) * (mnistCanvas.height / rect.height),
-  };
-}
+let clsPoints   = [];
+let clsBoundary = [];
+let clsTestPoint = null;  // {x, y} in data coords
 
-function startDraw(e) {
-  e.preventDefault();
-  drawing = true;
-  const pos = getCanvasPos(e);
-  mnistCtx.beginPath();
-  mnistCtx.moveTo(pos.x, pos.y);
+// ── Coordinate mapping ──────────────────────────────────────────
+function dataToCanvas(dx, dy) {
+  const cx = ((dx - CLS_DATA_MIN) / CLS_DATA_RANGE) * CLS_CANVAS_SIZE;
+  const cy = ((CLS_DATA_MAX - dy) / CLS_DATA_RANGE) * CLS_CANVAS_SIZE;  // Y-flip
+  return [cx, cy];
 }
 
-function moveDraw(e) {
-  if (!drawing) return;
-  e.preventDefault();
-  const pos = getCanvasPos(e);
-  mnistCtx.strokeStyle = "#fff";
-  mnistCtx.lineWidth = 16;
-  mnistCtx.lineCap = "round";
-  mnistCtx.lineJoin = "round";
-  mnistCtx.lineTo(pos.x, pos.y);
-  mnistCtx.stroke();
+function canvasToData(cx, cy) {
+  const dx = (cx / CLS_CANVAS_SIZE) * CLS_DATA_RANGE + CLS_DATA_MIN;
+  const dy = CLS_DATA_MAX - (cy / CLS_CANVAS_SIZE) * CLS_DATA_RANGE;  // Y-flip
+  return [dx, dy];
 }
 
-function stopDraw(e) {
-  if (e) e.preventDefault();
-  drawing = false;
+// ── Drawing ─────────────────────────────────────────────────────
+function drawClassifierPlot() {
+  const ctx = clsCtx;
+  const W = CLS_CANVAS_SIZE;
+  ctx.clearRect(0, 0, W, W);
+
+  // Background
+  ctx.fillStyle = "#12141c";
+  ctx.fillRect(0, 0, W, W);
+
+  // Grid lines
+  ctx.strokeStyle = "#1e2130";
+  ctx.lineWidth = 1;
+  for (let v = CLS_DATA_MIN; v <= CLS_DATA_MAX; v++) {
+    const [gx] = dataToCanvas(v, 0);
+    const [, gy] = dataToCanvas(0, v);
+    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, W); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle = "#2a2d3a";
+  ctx.lineWidth = 1.5;
+  const [ax0, ay0] = dataToCanvas(0, CLS_DATA_MIN);
+  const [ax1, ay1] = dataToCanvas(0, CLS_DATA_MAX);
+  ctx.beginPath(); ctx.moveTo(ax0, ay0); ctx.lineTo(ax1, ay1); ctx.stroke();
+  const [bx0, by0] = dataToCanvas(CLS_DATA_MIN, 0);
+  const [bx1, by1] = dataToCanvas(CLS_DATA_MAX, 0);
+  ctx.beginPath(); ctx.moveTo(bx0, by0); ctx.lineTo(bx1, by1); ctx.stroke();
+
+  // Decision boundary
+  if (clsBoundary.length === 2) {
+    const [lx0, ly0] = dataToCanvas(clsBoundary[0][0], clsBoundary[0][1]);
+    const [lx1, ly1] = dataToCanvas(clsBoundary[1][0], clsBoundary[1][1]);
+    ctx.save();
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = "#d4c455";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(lx0, ly0); ctx.lineTo(lx1, ly1); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Data points
+  for (const p of clsPoints) {
+    const [px, py] = dataToCanvas(p.x, p.y);
+    ctx.beginPath();
+    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.fillStyle = p.label === 0 ? "#e05555" : "#44bbaa";
+    ctx.fill();
+  }
+
+  // Test point
+  if (clsTestPoint) {
+    const [tx, ty] = dataToCanvas(clsTestPoint.x, clsTestPoint.y);
+    ctx.beginPath();
+    ctx.arc(tx, ty, 7, 0, Math.PI * 2);
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+  }
 }
 
-mnistCanvas.addEventListener("mousedown", startDraw);
-mnistCanvas.addEventListener("mousemove", moveDraw);
-mnistCanvas.addEventListener("mouseup", stopDraw);
-mnistCanvas.addEventListener("mouseleave", stopDraw);
-mnistCanvas.addEventListener("touchstart", startDraw);
-mnistCanvas.addEventListener("touchmove", moveDraw);
-mnistCanvas.addEventListener("touchend", stopDraw);
-
-function clearCanvas() {
-  initCanvas();
-  document.getElementById("mnistChart").innerHTML =
-    '<span style="color:#666">Draw a digit and click <b>Classify</b>.</span>';
-  document.getElementById("mnistInternals").style.display = "none";
-  document.getElementById("mnistPreviewBox").style.display = "none";
+// ── Data loading ────────────────────────────────────────────────
+async function loadClassifierData() {
+  try {
+    const resp = await fetch("/api/classifier/data");
+    const data = await resp.json();
+    clsPoints = data.points || [];
+    clsBoundary = data.boundary || [];
+    // Update badge
+    const badge = document.getElementById("classifierBadge");
+    if (data.trained) {
+      badge.className = "badge badge-green";
+      badge.textContent = "Trained";
+    } else {
+      badge.className = "badge badge-red";
+      badge.textContent = "Untrained";
+    }
+    drawClassifierPlot();
+  } catch (err) {
+    console.error("Failed to load classifier data:", err);
+  }
 }
 
-// ── MNIST classify ──────────────────────────────────────────────
-async function classifyDigit() {
-  const imageData = mnistCanvas.toDataURL("image/png");
-  const temp = parseFloat(document.getElementById("mnistTemp").value);
-  const btn = document.getElementById("btnClassify");
-  btn.disabled = true;
-  btn.textContent = "…";
+// ── Canvas click → classify ─────────────────────────────────────
+clsCanvas.addEventListener("click", function(e) {
+  const rect = clsCanvas.getBoundingClientRect();
+  const cx = (e.clientX - rect.left) * (CLS_CANVAS_SIZE / rect.width);
+  const cy = (e.clientY - rect.top) * (CLS_CANVAS_SIZE / rect.height);
+  const [dx, dy] = canvasToData(cx, cy);
+  classifyPoint(dx, dy);
+});
 
+async function classifyPoint(x, y) {
+  clsTestPoint = { x, y };
+  drawClassifierPlot();
+
+  const temp = parseFloat(document.getElementById("classifierTemp").value);
   try {
     const resp = await fetch("/api/classify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image: imageData, temperature: temp }),
+      body: JSON.stringify({ x, y, temperature: temp }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
 
-    renderMnistChart(data.probabilities);
+    renderClassifierChart(data.probabilities);
 
     // Show model internals
-    const internals = document.getElementById("mnistInternals");
+    const internals = document.getElementById("classifierInternals");
     internals.style.display = "block";
-    document.getElementById("mnistLogits").textContent =
+    document.getElementById("classifierLogits").textContent =
       "[" + data.logits.map(v => String(v)).join(", ") + "]";
-    document.getElementById("mnistPredicted").textContent = String(data.predicted);
-
-    // Show preview
-    if (data.preview) {
-      document.getElementById("mnistPreviewBox").style.display = "block";
-      document.getElementById("mnistPreview").src = data.preview;
-    }
+    const labels = ["Class A", "Class B"];
+    document.getElementById("classifierPredicted").textContent = labels[data.predicted];
   } catch (err) {
-    document.getElementById("mnistChart").innerHTML =
+    document.getElementById("classifierChart").innerHTML =
       `<div class="error">${escapeHtml(err.message)}</div>`;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Classify";
   }
 }
 
-function renderMnistChart(probabilities) {
+function renderClassifierChart(probabilities) {
   const maxProb = Math.max(...probabilities.map(p => p.prob));
-  const chart = document.getElementById("mnistChart");
-  chart.innerHTML = probabilities.map(p => {
+  const chart = document.getElementById("classifierChart");
+  const colors = ["#e05555", "#44bbaa"];
+  chart.innerHTML = probabilities.map((p, i) => {
     const pct = maxProb > 0 ? (p.prob / maxProb) * 100 : 0;
     const probStr = (p.prob * 100).toFixed(2) + "%";
     return `
-      <div class="mnist-bar-row" title="Digit ${p.digit}: ${probStr}">
-        <span class="mnist-bar-label">${p.digit}</span>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <div class="classifier-bar-row" title="${p.label}: ${probStr}">
+        <span class="classifier-bar-label">${escapeHtml(p.label)}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${colors[i]}"></div></div>
         <span class="bar-value">${probStr}</span>
       </div>`;
   }).join("");
 }
 
-// ── MNIST train ─────────────────────────────────────────────────
-function trainMnist() {
+// ── Train / Reset ───────────────────────────────────────────────
+async function trainClassifier() {
   const btn = document.getElementById("btnTrain");
-  const badge = document.getElementById("mnistBadge");
-  const status = document.getElementById("mnistTrainStatus");
+  const badge = document.getElementById("classifierBadge");
+  const status = document.getElementById("classifierTrainStatus");
 
   btn.disabled = true;
   btn.textContent = "Training…";
-  status.innerHTML = '<span class="spinner"></span>Starting…';
+  status.innerHTML = '<span class="spinner"></span>Training…';
 
-  const es = new EventSource("/api/mnist/train");
+  try {
+    const resp = await fetch("/api/classifier/train", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
 
-  es.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    switch (data.stage) {
-      case "downloading":
-        status.innerHTML = '<span class="spinner"></span>Downloading data…';
-        break;
-      case "epoch":
-        status.innerHTML = `<span class="spinner"></span>Training epoch ${data.epoch} of ${data.total}…`;
-        break;
-      case "done":
-        badge.className = "badge badge-green";
-        badge.textContent = "Trained";
-        status.textContent = `${data.epochs} epochs — ${(data.accuracy * 100).toFixed(1)}% test accuracy`;
-        es.close();
-        btn.disabled = false;
-        btn.textContent = "Train Model";
-        break;
-      case "error":
-        status.innerHTML = `<span class="error" style="display:inline;padding:0.3rem 0.6rem">${escapeHtml(data.error)}</span>`;
-        es.close();
-        btn.disabled = false;
-        btn.textContent = "Train Model";
-        break;
+    badge.className = "badge badge-green";
+    badge.textContent = "Trained";
+    status.textContent = `${data.steps} steps — ${(data.accuracy * 100).toFixed(1)}% accuracy`;
+
+    await loadClassifierData();
+    // Re-classify test point if one exists
+    if (clsTestPoint) {
+      await classifyPoint(clsTestPoint.x, clsTestPoint.y);
     }
-  };
-
-  es.onerror = () => {
-    es.close();
-    status.innerHTML = '<span class="error" style="display:inline;padding:0.3rem 0.6rem">Connection lost — training may still be running. Refresh to check.</span>';
+  } catch (err) {
+    status.innerHTML = `<span class="error" style="display:inline;padding:0.3rem 0.6rem">${escapeHtml(err.message)}</span>`;
+  } finally {
     btn.disabled = false;
     btn.textContent = "Train Model";
-  };
+  }
 }
 
-async function resetMnist() {
-  const btn = document.getElementById("btnResetMnist");
-  const badge = document.getElementById("mnistBadge");
-  const status = document.getElementById("mnistTrainStatus");
+async function resetClassifier() {
+  const btn = document.getElementById("btnResetClassifier");
+  const badge = document.getElementById("classifierBadge");
+  const status = document.getElementById("classifierTrainStatus");
 
   btn.disabled = true;
   try {
-    const resp = await fetch("/api/mnist/reset", {
+    const resp = await fetch("/api/classifier/reset", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
@@ -949,12 +994,21 @@ async function resetMnist() {
     badge.className = "badge badge-red";
     badge.textContent = "Untrained";
     status.textContent = "";
+
+    await loadClassifierData();
+    // Re-classify test point if one exists
+    if (clsTestPoint) {
+      await classifyPoint(clsTestPoint.x, clsTestPoint.y);
+    }
   } catch (err) {
     status.innerHTML = `<span class="error" style="display:inline;padding:0.3rem 0.6rem">${escapeHtml(err.message)}</span>`;
   } finally {
     btn.disabled = false;
   }
 }
+
+// ── Init ────────────────────────────────────────────────────────
+loadClassifierData();
 </script>
 </body>
 </html>
