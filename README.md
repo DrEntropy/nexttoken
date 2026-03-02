@@ -4,6 +4,8 @@ Interactive demo that lets you explore how a language model generates text, powe
 
 The app has three tabs that build on each other. Start by **chatting** with the model to see what it can do. Then try the **Digit Classifier** to see how a simpler model turns an input into probabilities — with only 10 possible answers, you can see the full picture. Finally, open **Token Explorer** to watch the language model predict text one piece at a time, choosing from 50,000+ candidates at each step.
 
+See also [MicroGpt demo](https://github.com/DrEntropy/microgpt) that goes into more detail on the structure of a transformer model (using character GPT).
+
 ## What is a token?
 
 A **token** is the basic unit a language model works with. It's usually a word or part of a word — for example, the word "prediction" might be split into two tokens: "predict" and "ion". Common short words like "the" or "is" are typically one token each.
