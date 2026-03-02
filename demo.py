@@ -27,7 +27,7 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL = os.environ.get("NEXTTOKEN_MODEL", "HuggingFaceTB/SmolLM2-135M-Instruct")
+DEFAULT_MODEL = os.environ.get("NEXTTOKEN_MODEL") or "HuggingFaceTB/SmolLM2-135M-Instruct"
 DEVICE_OVERRIDE = os.environ.get("NEXTTOKEN_DEVICE", "auto")
 MNIST_DATA_DIR = os.environ.get("NEXTTOKEN_MNIST_DATA", "data")
 
