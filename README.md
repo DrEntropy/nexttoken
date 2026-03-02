@@ -2,7 +2,7 @@
 
 Interactive demo that lets you explore how a language model generates text, powered by [HuggingFace Transformers](https://huggingface.co/docs/transformers).
 
-The app has three tabs that build on each other. Start by **chatting** with the model to see what it can do. Then try the **Digit Classifier** to see how a simpler model turns an input into probabilities — with only 10 possible answers, you can see the full picture. Finally, open **Token Explorer** to watch the language model predict text one piece at a time, choosing from 50,000+ candidates at each step.
+The app has three tabs that build on each other. Start by **chatting** with the model to see what it can do. Then try the **2D Classifier** to see how a tiny model (just 6 parameters!) turns an input into probabilities — with only 2 possible answers, you can see the full picture and even visualize the decision boundary. Finally, open **Token Explorer** to watch the language model predict text one piece at a time, choosing from 50,000+ candidates at each step.
 
 See also [MicroGpt demo](https://github.com/DrEntropy/microgpt) that goes into more detail on the structure of a transformer model (using character GPT).
 
@@ -37,7 +37,7 @@ If you prefer not to install Python dependencies locally, you can run with Docke
 docker compose up --build
 ```
 
-The first run builds the image (~600 MB) and downloads the model (~270 MB). Model weights and MNIST data are stored in a Docker volume so subsequent starts are fast.
+The first run builds the image (~600 MB) and downloads the model (~270 MB). Model weights are stored in a Docker volume so subsequent starts are fast.
 
 Open **http://localhost:5005** in your browser.
 
@@ -76,7 +76,7 @@ NEXTTOKEN_DEVICE=cpu uv run demo.py
 
 ## UI Controls
 
-The three tabs are meant to be explored in order: **Chat → Digit Classifier → Token Explorer**.
+The three tabs are meant to be explored in order: **Chat → 2D Classifier → Token Explorer**.
 
 ### Chat (start here)
 
@@ -86,19 +86,18 @@ Chat with the model to see what it can do. Under the hood, the model generates i
 - **Temperature** — Controls randomness (0 = predictable, higher = more creative)
 - **Clear Chat** — Reset the conversation history
 
-### Digit Classifier (peek behind the curtain)
+### 2D Classifier (peek behind the curtain)
 
-Now see how a model makes decisions. Draw a digit, and a small neural network scores each possible answer (0–9) and shows the probabilities as a bar chart. With only 10 possible outputs, you can see the full distribution at a glance. The model starts with random weights — train it and watch predictions go from random to confident.
+Now see how a model makes decisions. A logistic regression model (`nn.Linear(2, 2)` — just 6 parameters) classifies 2D points into two classes. Click anywhere on the scatter plot and the model scores each class, showing the probabilities as a bar chart. A neural net diagram displays all 6 parameters (4 weights + 2 biases) and a dashed decision boundary shows where the model is 50/50. The model starts with random weights — train it and watch the boundary snap into place.
 
-- **Train Model** — Train the CNN for 2 epochs on MNIST (~3–5s on CPU). Downloads the dataset (~11 MB) on first run.
-- **Canvas** — Draw a digit (0–9) with your mouse or touchscreen
-- **Classify** — Run the drawn digit through the CNN and display a probability bar chart
-- **Clear** — Reset the canvas
+- **Train Model** — 200 steps of SGD on synthetic data (instant, ~10ms). No data download needed.
+- **Reset Model** — Re-initialize to random weights
+- **Scatter plot** — Click to classify that (x, y) point
 - **Temperature** — Controls how spread out the probabilities are (same concept as Chat)
 
 ### Token Explorer (the full picture)
 
-The same idea as the Digit Classifier, but now applied to text. Enter a prompt and see which tokens the model thinks should come next — except now there are 50,000+ candidates instead of 10. Click any bar to append that token and repeat.
+The same idea as the 2D Classifier, but now applied to text. Enter a prompt and see which tokens the model thinks should come next — except now there are 50,000+ candidates instead of 2. Click any bar to append that token and repeat.
 
 - **Model** — Shows the loaded model (read-only; change via `NEXTTOKEN_MODEL` env var)
 - **Top-K** — Number of candidate tokens to display (1–50)
@@ -119,7 +118,7 @@ The same idea as the Digit Classifier, but now applied to text. Enter a prompt a
 | **Top-K** | How many of the highest-probability candidates to show |
 | **Forward pass** | One run of the model: feed in tokens, get out logits |
 | **Greedy** | Picking the single most likely token at each step (temperature = 0 has the same effect) |
-| **MNIST** | A classic dataset of 70,000 handwritten digit images (0–9), used to train and test classifiers |
+| **Decision boundary** | The line where the model is exactly 50/50 between two classes — points on one side are classified as A, the other side as B |
 
 ## Troubleshooting
 
@@ -147,7 +146,7 @@ The visualizer replaces leading spaces with `␠` so whitespace is visible. The 
 
 ## How This Was Built
 
-This project was vibe-coded using [Claude Code](https://claude.com/claude-code). The initial project was created from a single prompt similar to [`prompt.md`](prompt.md) but the original used Ollama instead of HuggingFace. I switched to HuggingFace for easier local testing and broader model compatibility, but the core idea is the same. The Chat tab and Digit Classifier tab were added later, also with Claude Code's help but are not reflected in this prompt.
+This project was vibe-coded using [Claude Code](https://claude.com/claude-code). The initial project was created from a single prompt similar to [`prompt.md`](prompt.md) but the original used Ollama instead of HuggingFace. I switched to HuggingFace for easier local testing and broader model compatibility, but the core idea is the same. The Chat tab and 2D Classifier tab were added later, also with Claude Code's help but are not reflected in this prompt.
 
 The prompt itself was created by chatgpt (5.2) with a conversation on what i was trying to create. A simple prompt like this would work for a start I think:
 
