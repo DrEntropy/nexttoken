@@ -339,6 +339,12 @@
     color: #777;
     margin-top: 0.2rem;
   }
+
+  /* ── Neural net diagram ──────────────────────────────────────── */
+  #nnDiagram {
+    display: block;
+    margin: 0 auto;
+  }
 </style>
 </head>
 <body>
@@ -481,6 +487,12 @@
     <span id="classifierBadge" class="badge badge-red">Untrained</span>
     <span id="classifierTrainStatus" style="font-size:0.82rem; color:#888;"></span>
   </div>
+</div>
+
+<!-- ── Neural net diagram ───────────────────────────────────────── -->
+<div class="card">
+  <h2>Model Diagram &mdash; All 6 Parameters</h2>
+  <canvas id="nnDiagram" width="520" height="200"></canvas>
 </div>
 
 <!-- ── Scatter plot + results ──────────────────────────────────── -->
@@ -785,6 +797,7 @@ const clsCtx    = clsCanvas.getContext("2d");
 
 let clsPoints   = [];
 let clsBoundary = [];
+let clsWeights  = null;   // {w00, w01, w10, w11, b0, b1}
 let clsTestPoint = null;  // {x, y} in data coords
 
 // ── Coordinate mapping ──────────────────────────────────────────
@@ -873,6 +886,7 @@ async function loadClassifierData() {
     const data = await resp.json();
     clsPoints = data.points || [];
     clsBoundary = data.boundary || [];
+    clsWeights = data.weights || null;
     // Update badge
     const badge = document.getElementById("classifierBadge");
     if (data.trained) {
@@ -883,6 +897,7 @@ async function loadClassifierData() {
       badge.textContent = "Untrained";
     }
     drawClassifierPlot();
+    drawNNDiagram();
   } catch (err) {
     console.error("Failed to load classifier data:", err);
   }
@@ -1005,6 +1020,108 @@ async function resetClassifier() {
   } finally {
     btn.disabled = false;
   }
+}
+
+// ── Neural net diagram ──────────────────────────────────────────
+const nnCanvas = document.getElementById("nnDiagram");
+const nnCtx    = nnCanvas.getContext("2d");
+
+function drawNNDiagram() {
+  const ctx = nnCtx;
+  const W = nnCanvas.width;
+  const H = nnCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (!clsWeights) return;
+
+  const R = 22;           // node radius
+  const inX = 80;         // input column x
+  const outX = W - 80;    // output column x
+  const midY = H / 2;
+
+  // Node positions: inputs at left, outputs at right
+  const nodes = {
+    x:  { cx: inX,  cy: midY - 40, label: "x",       color: "#7c8aff" },
+    y:  { cx: inX,  cy: midY + 40, label: "y",       color: "#7c8aff" },
+    a:  { cx: outX, cy: midY - 40, label: "Class A", color: "#e05555" },
+    b:  { cx: outX, cy: midY + 40, label: "Class B", color: "#44bbaa" },
+  };
+
+  // Edge definitions: [from, to, weight, labelT]
+  // labelT = where along the line to place the label (0–1)
+  const edges = [
+    ["x", "a", clsWeights.w00, 0.35],   // straight top — label left of center
+    ["y", "a", clsWeights.w01, 0.65],    // cross up — label right of center
+    ["x", "b", clsWeights.w10, 0.35],    // cross down — label left of center
+    ["y", "b", clsWeights.w11, 0.65],    // straight bottom — label right of center
+  ];
+
+  // Draw edges first (behind nodes)
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const [fromId, toId, w, labelT] of edges) {
+    const f = nodes[fromId];
+    const t = nodes[toId];
+
+    // Line thickness proportional to |weight|, clamped
+    const absW = Math.min(Math.abs(w), 5);
+    const thickness = 1 + absW * 1.2;
+
+    // Color: positive = blue-ish, negative = orange-ish
+    ctx.strokeStyle = w >= 0 ? "rgba(124,138,255,0.6)" : "rgba(224,108,64,0.6)";
+    ctx.lineWidth = thickness;
+    ctx.beginPath();
+    ctx.moveTo(f.cx + R, f.cy);
+    ctx.lineTo(t.cx - R, t.cy);
+    ctx.stroke();
+
+    // Weight label along the line at position labelT
+    const lx = f.cx + (t.cx - f.cx) * labelT;
+    const ly = f.cy + (t.cy - f.cy) * labelT;
+    // Nudge perpendicular to the line to avoid sitting on it
+    const offsetY = -11;
+
+    ctx.font = "bold 12px 'JetBrains Mono', 'Fira Code', monospace";
+    const text = w.toFixed(3);
+    const tw = ctx.measureText(text).width;
+    // Background pill for readability
+    ctx.fillStyle = "#1a1d27";
+    ctx.fillRect(lx - tw / 2 - 4, ly + offsetY - 8, tw + 8, 16);
+    ctx.fillStyle = w >= 0 ? "#a0aaff" : "#f0a070";
+    ctx.fillText(text, lx, ly + offsetY);
+  }
+
+  // Draw nodes
+  for (const [id, n] of Object.entries(nodes)) {
+    ctx.beginPath();
+    ctx.arc(n.cx, n.cy, R, 0, Math.PI * 2);
+    ctx.fillStyle = "#12141c";
+    ctx.fill();
+    ctx.strokeStyle = n.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.font = "bold 13px 'Inter', system-ui, sans-serif";
+    ctx.fillStyle = n.color;
+    ctx.textAlign = "center";
+    ctx.fillText(n.label, n.cx, n.cy);
+  }
+
+  // Bias labels next to output nodes
+  ctx.font = "11px 'JetBrains Mono', monospace";
+  ctx.textAlign = "left";
+  const biases = [
+    { node: nodes.a, val: clsWeights.b0 },
+    { node: nodes.b, val: clsWeights.b1 },
+  ];
+  for (const { node, val } of biases) {
+    const sign = val >= 0 ? "+" : "";
+    ctx.fillStyle = "#888";
+    ctx.fillText("bias", node.cx - 12, node.cy + R + 14);
+    ctx.fillStyle = val >= 0 ? "#a0aaff" : "#f0a070";
+    ctx.fillText(sign + val.toFixed(3), node.cx - 12, node.cy + R + 27);
+  }
+
 }
 
 // ── Init ────────────────────────────────────────────────────────

@@ -282,9 +282,21 @@ def classifier_data():
             "label": int(_blob_y[i].item()),
         })
     boundary = _decision_boundary_endpoints()
+    # Expose all 6 parameters for the neural-net diagram
+    w = _classifier.weight.detach()
+    b = _classifier.bias.detach()
+    weights = {
+        "w00": round(float(w[0, 0]), 4),  # x → Class A
+        "w01": round(float(w[0, 1]), 4),  # y → Class A
+        "w10": round(float(w[1, 0]), 4),  # x → Class B
+        "w11": round(float(w[1, 1]), 4),  # y → Class B
+        "b0":  round(float(b[0]), 4),      # Class A bias
+        "b1":  round(float(b[1]), 4),      # Class B bias
+    }
     return jsonify({
         "points": points,
         "boundary": boundary,
+        "weights": weights,
         "trained": _classifier_trained,
     })
 
