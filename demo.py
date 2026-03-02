@@ -10,6 +10,7 @@ Open: http://localhost:5005
 
 import base64
 import io
+import json
 import os
 import textwrap
 import threading
@@ -17,7 +18,7 @@ import threading
 import torch
 import torch.nn as nn
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template_string, request
+from flask import Flask, Response, jsonify, render_template_string, request
 from PIL import Image
 from torchvision import datasets, transforms
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -291,9 +292,9 @@ def list_models():
 
 # ── MNIST endpoints ──────────────────────────────────────────────────────
 
-@app.route("/api/mnist/train", methods=["POST"])
+@app.route("/api/mnist/train", methods=["GET", "POST"])
 def mnist_train():
-    """Train the MNIST CNN for 2 epochs. Thread-locked to prevent concurrent runs."""
+    """Train the MNIST CNN for 2 epochs, streaming progress via SSE."""
     global _mnist_trained, _mnist_training
 
     with _mnist_lock:
@@ -301,50 +302,58 @@ def mnist_train():
             return jsonify({"error": "Training is already in progress."}), 409
         _mnist_training = True
 
-    try:
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,)),
-        ])
-        print("Loading MNIST training data…")
-        train_data = datasets.MNIST(MNIST_DATA_DIR, train=True, download=True, transform=transform)
-        loader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
+    def generate():
+        try:
+            yield f"data: {json.dumps({'stage': 'downloading'})}\n\n"
 
-        _mnist_model.train()
-        optimizer = torch.optim.Adam(_mnist_model.parameters(), lr=1e-3)
-        criterion = nn.CrossEntropyLoss()
+            transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.1307,), (0.3081,)),
+            ])
+            print("Loading MNIST training data…")
+            train_data = datasets.MNIST(MNIST_DATA_DIR, train=True, download=True, transform=transform)
+            loader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
 
-        epochs = 2
-        for epoch in range(epochs):
-            print(f"Epoch {epoch+1}/{epochs}...")
-            for images, labels in loader:
-                images, labels = images.to(DEVICE), labels.to(DEVICE)
-                optimizer.zero_grad()
-                loss = criterion(_mnist_model(images), labels)
-                loss.backward()
-                optimizer.step()
+            _mnist_model.train()
+            optimizer = torch.optim.Adam(_mnist_model.parameters(), lr=1e-3)
+            criterion = nn.CrossEntropyLoss()
 
-        # Quick accuracy check on test set
-        _mnist_model.eval()
-        test_data = datasets.MNIST(MNIST_DATA_DIR, train=False, download=True, transform=transform)
-        test_loader = torch.utils.data.DataLoader(test_data, batch_size=256)
-        correct = total = 0
-        with torch.no_grad():
-            for images, labels in test_loader:
-                images, labels = images.to(DEVICE), labels.to(DEVICE)
-                preds = _mnist_model(images).argmax(dim=1)
-                correct += (preds == labels).sum().item()
-                total += labels.size(0)
+            epochs = 2
+            for epoch in range(epochs):
+                yield f"data: {json.dumps({'stage': 'epoch', 'epoch': epoch + 1, 'total': epochs})}\n\n"
+                print(f"Epoch {epoch+1}/{epochs}...")
+                for images, labels in loader:
+                    images, labels = images.to(DEVICE), labels.to(DEVICE)
+                    optimizer.zero_grad()
+                    loss = criterion(_mnist_model(images), labels)
+                    loss.backward()
+                    optimizer.step()
 
-        accuracy = round(correct / total, 4)
-        _mnist_trained = True
+            # Quick accuracy check on test set
+            _mnist_model.eval()
+            test_data = datasets.MNIST(MNIST_DATA_DIR, train=False, download=True, transform=transform)
+            test_loader = torch.utils.data.DataLoader(test_data, batch_size=256)
+            correct = total = 0
+            with torch.no_grad():
+                for images, labels in test_loader:
+                    images, labels = images.to(DEVICE), labels.to(DEVICE)
+                    preds = _mnist_model(images).argmax(dim=1)
+                    correct += (preds == labels).sum().item()
+                    total += labels.size(0)
 
-        return jsonify({"status": "ok", "accuracy": accuracy, "epochs": epochs})
-    except Exception as exc:
-        return jsonify({"error": f"Training error: {exc}"}), 500
-    finally:
-        with _mnist_lock:
-            _mnist_training = False
+            accuracy = round(correct / total, 4)
+            global _mnist_trained
+            _mnist_trained = True
+
+            yield f"data: {json.dumps({'stage': 'done', 'epochs': epochs, 'accuracy': accuracy})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'stage': 'error', 'error': str(exc)})}\n\n"
+        finally:
+            with _mnist_lock:
+                global _mnist_training
+                _mnist_training = False
+
+    return Response(generate(), mimetype="text/event-stream")
 
 
 @app.route("/api/mnist/reset", methods=["POST"])

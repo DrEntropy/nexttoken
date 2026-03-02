@@ -887,32 +887,49 @@ function renderMnistChart(probabilities) {
 }
 
 // ── MNIST train ─────────────────────────────────────────────────
-async function trainMnist() {
+function trainMnist() {
   const btn = document.getElementById("btnTrain");
   const badge = document.getElementById("mnistBadge");
   const status = document.getElementById("mnistTrainStatus");
 
   btn.disabled = true;
   btn.textContent = "Training…";
-  status.innerHTML = '<span class="spinner"></span>Downloading data & training (may take a few seconds)…';
+  status.innerHTML = '<span class="spinner"></span>Starting…';
 
-  try {
-    const resp = await fetch("/api/mnist/train", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+  const es = new EventSource("/api/mnist/train");
 
-    badge.className = "badge badge-green";
-    badge.textContent = "Trained";
-    status.textContent = `${data.epochs} epochs — ${(data.accuracy * 100).toFixed(1)}% test accuracy`;
-  } catch (err) {
-    status.innerHTML = `<span class="error" style="display:inline;padding:0.3rem 0.6rem">${escapeHtml(err.message)}</span>`;
-  } finally {
+  es.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    switch (data.stage) {
+      case "downloading":
+        status.innerHTML = '<span class="spinner"></span>Downloading data…';
+        break;
+      case "epoch":
+        status.innerHTML = `<span class="spinner"></span>Training epoch ${data.epoch} of ${data.total}…`;
+        break;
+      case "done":
+        badge.className = "badge badge-green";
+        badge.textContent = "Trained";
+        status.textContent = `${data.epochs} epochs — ${(data.accuracy * 100).toFixed(1)}% test accuracy`;
+        es.close();
+        btn.disabled = false;
+        btn.textContent = "Train Model";
+        break;
+      case "error":
+        status.innerHTML = `<span class="error" style="display:inline;padding:0.3rem 0.6rem">${escapeHtml(data.error)}</span>`;
+        es.close();
+        btn.disabled = false;
+        btn.textContent = "Train Model";
+        break;
+    }
+  };
+
+  es.onerror = () => {
+    es.close();
+    status.innerHTML = '<span class="error" style="display:inline;padding:0.3rem 0.6rem">Connection lost — training may still be running. Refresh to check.</span>';
     btn.disabled = false;
     btn.textContent = "Train Model";
-  }
+  };
 }
 
 async function resetMnist() {
