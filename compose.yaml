@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    ports:
+      - "5005:5005"
+    environment:
+      - NEXTTOKEN_MODEL=${NEXTTOKEN_MODEL:-}
+    volumes:
+      - model-cache:/data
+
+volumes:
+  model-cache:

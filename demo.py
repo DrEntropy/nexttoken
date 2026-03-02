@@ -27,8 +27,9 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL = os.environ.get("NEXTTOKEN_MODEL", "HuggingFaceTB/SmolLM2-360M-Instruct")
+DEFAULT_MODEL = os.environ.get("NEXTTOKEN_MODEL", "HuggingFaceTB/SmolLM2-135M-Instruct")
 DEVICE_OVERRIDE = os.environ.get("NEXTTOKEN_DEVICE", "auto")
+MNIST_DATA_DIR = os.environ.get("NEXTTOKEN_MNIST_DATA", "data")
 
 app = Flask(__name__)
 
@@ -306,7 +307,7 @@ def mnist_train():
             transforms.Normalize((0.1307,), (0.3081,)),
         ])
         print("Loading MNIST training data…")
-        train_data = datasets.MNIST("data", train=True, download=True, transform=transform)
+        train_data = datasets.MNIST(MNIST_DATA_DIR, train=True, download=True, transform=transform)
         loader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
 
         _mnist_model.train()
@@ -325,7 +326,7 @@ def mnist_train():
 
         # Quick accuracy check on test set
         _mnist_model.eval()
-        test_data = datasets.MNIST("data", train=False, download=True, transform=transform)
+        test_data = datasets.MNIST(MNIST_DATA_DIR, train=False, download=True, transform=transform)
         test_loader = torch.utils.data.DataLoader(test_data, batch_size=256)
         correct = total = 0
         with torch.no_grad():

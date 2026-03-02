@@ -27,7 +27,7 @@ Interactive single-page web app that visualizes next-token predictions using a H
 
 ### Model loading
 
-The model is loaded unconditionally at module level via `_load_model()`. First run downloads the model from HuggingFace Hub (~720 MB for the default model). `use_reloader=False` is set in `app.run()` to prevent Flask's reloader from triggering a second load.
+The model is loaded unconditionally at module level via `_load_model()`. First run downloads the model from HuggingFace Hub (~270 MB for the default model). `use_reloader=False` is set in `app.run()` to prevent Flask's reloader from triggering a second load.
 
 ### MNIST digit classifier
 
@@ -44,7 +44,7 @@ The "Digit Classifier" tab demonstrates the same input → forward pass → logi
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `NEXTTOKEN_MODEL` | `HuggingFaceTB/SmolLM2-360M-Instruct` | HuggingFace model ID |
+| `NEXTTOKEN_MODEL` | `HuggingFaceTB/SmolLM2-135M-Instruct` | HuggingFace model ID |
 | `NEXTTOKEN_DEVICE` | `auto` | Device for inference (`auto`, `cpu`, `cuda`, `mps`) |
 
 ## File Structure
@@ -69,6 +69,6 @@ prompt.md            # Original generation prompt used to create this project
 ## Common Tasks
 
 - **Run locally**: `uv run demo.py` (opens on http://localhost:5005, first run downloads model)
-- **Change default model**: `NEXTTOKEN_MODEL=HuggingFaceTB/SmolLM2-135M-Instruct uv run demo.py`
+- **Change default model**: `NEXTTOKEN_MODEL=HuggingFaceTB/SmolLM2-360M-Instruct uv run demo.py`
 - **Force CPU**: `NEXTTOKEN_DEVICE=cpu uv run demo.py`
 - **Test import**: `uv run python -c "import demo; print('OK')"`

@@ -1,0 +1,13 @@
+.venv/
+.git/
+.gitignore
+.claude/
+.env
+__pycache__/
+data/
+*.pyc
+README.md
+prompt.md
+CLAUDE.md
+list_models.py
+uv.lock

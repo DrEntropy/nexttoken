@@ -25,15 +25,33 @@ When you type a prompt, the model's **tokenizer** splits your text into tokens a
 uv run demo.py
 ```
 
-The first run will download the default model (`HuggingFaceTB/SmolLM2-360M-Instruct`, ~720 MB). Subsequent runs use the cached model.
+The first run will download the default model (`HuggingFaceTB/SmolLM2-135M-Instruct`, ~270 MB). Subsequent runs use the cached model.
 
 Open **http://localhost:5005** in your browser.
+
+### Docker (optional)
+
+If you prefer not to install Python dependencies locally, you can run with Docker:
+
+```bash
+docker compose up --build
+```
+
+The first run builds the image (~600 MB) and downloads the model (~270 MB). Model weights and MNIST data are stored in a Docker volume so subsequent starts are fast.
+
+Open **http://localhost:5005** in your browser.
+
+To use a different model:
+
+```bash
+NEXTTOKEN_MODEL=HuggingFaceTB/SmolLM2-360M-Instruct docker compose up --build
+```
 
 ## Configuration
 
 | Environment variable | Default | Description |
 |---|---|---|
-| `NEXTTOKEN_MODEL` | `HuggingFaceTB/SmolLM2-360M-Instruct` | HuggingFace model ID to load |
+| `NEXTTOKEN_MODEL` | `HuggingFaceTB/SmolLM2-135M-Instruct` | HuggingFace model ID to load |
 | `NEXTTOKEN_DEVICE` | `auto` | Inference device: `auto` (CUDA > MPS > CPU), `cpu`, `cuda`, `mps` |
 
 To see which models you already have cached locally:
@@ -47,7 +65,7 @@ This prints model IDs ready to copy-paste as the `NEXTTOKEN_MODEL` value.
 Example with a different model:
 
 ```bash
-NEXTTOKEN_MODEL=HuggingFaceTB/SmolLM2-135M-Instruct uv run demo.py
+NEXTTOKEN_MODEL=HuggingFaceTB/SmolLM2-360M-Instruct uv run demo.py
 ```
 
 Example forcing CPU:
@@ -107,15 +125,15 @@ The same idea as the Digit Classifier, but now applied to text. Enter a prompt a
 
 ### Model download is slow
 
-The first run downloads the model from HuggingFace Hub. For the default 360M model this is ~720 MB. You can use a smaller model:
+The first run downloads the model from HuggingFace Hub. For the default 135M model this is ~270 MB. You can use a larger model:
 
 ```bash
-NEXTTOKEN_MODEL=HuggingFaceTB/SmolLM2-135M-Instruct uv run demo.py
+NEXTTOKEN_MODEL=HuggingFaceTB/SmolLM2-360M-Instruct uv run demo.py
 ```
 
 ### Out of memory
 
-The default model runs on CPU with float32 (~1.5 GB RAM). If you're low on memory, try a smaller model. On GPU/MPS the model uses float16 automatically.
+The default 135M model runs on CPU with float32 (~0.6 GB RAM). If you're low on memory, it's already the smallest available. On GPU/MPS the model uses float16 automatically.
 
 ### First query is slow
 
